@@ -1,0 +1,21 @@
+{
+  "model_versions": [
+    {
+      "version": "1.0.0",
+      "date": "2026-01-03",
+      "models": {
+        "tabnet": "models/tabnet/tabnet_model.zip",
+        "bayesian": "models/bayesian/bayesian_network.pkl",
+        "hybrid": "models/hybrid/hybrid_model.pkl"
+      },
+      "metrics": {
+        "roc_auc": null,
+        "accuracy": null,
+        "f1_score": null
+      },
+      "status": "development",
+      "notes": "Initial model version"
+    }
+  ],
+  "active_version": "1.0.0"
+}

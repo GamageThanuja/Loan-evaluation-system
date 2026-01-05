@@ -1,0 +1,67 @@
+# Feature Definitions
+
+features:
+  # Demographic Features
+  - name: AGE_YEARS
+    type: numeric
+    description: Age of applicant in years
+    min: 18
+    max: 100
+    
+  - name: CODE_GENDER
+    type: categorical
+    description: Gender of applicant
+    categories: [M, F, XNA]
+    
+  - name: NAME_EDUCATION_TYPE
+    type: categorical
+    description: Level of education
+    
+  - name: NAME_FAMILY_STATUS
+    type: categorical
+    description: Family status
+    
+  # Financial Features
+  - name: AMT_INCOME_TOTAL
+    type: numeric
+    description: Total income
+    min: 0
+    
+  - name: AMT_CREDIT
+    type: numeric
+    description: Credit amount
+    min: 0
+    
+  - name: AMT_ANNUITY
+    type: numeric
+    description: Loan annuity
+    min: 0
+    
+  - name: AMT_GOODS_PRICE
+    type: numeric
+    description: Price of goods for which loan is given
+    min: 0
+    
+  # Employment Features
+  - name: DAYS_EMPLOYED
+    type: numeric
+    description: Days employed (negative values)
+    
+  - name: OCCUPATION_TYPE
+    type: categorical
+    description: Type of occupation
+    
+  # Engineered Features
+  - name: CREDIT_INCOME_RATIO
+    type: numeric
+    description: Ratio of credit to income
+    min: 0
+    
+  - name: ANNUITY_INCOME_RATIO
+    type: numeric
+    description: Ratio of annuity to income
+    min: 0
+    
+  - name: EMPLOYMENT_AGE_RATIO
+    type: numeric
+    description: Ratio of employment days to age

@@ -1,0 +1,31 @@
+# Target Variable Definition
+
+target:
+  name: TARGET
+  type: binary
+  description: Credit default indicator (1 = default, 0 = no default)
+  classes:
+    - value: 0
+      label: No Default
+      description: Client with payment difficulties
+    - value: 1
+      label: Default
+      description: Client without payment difficulties
+  
+  class_distribution:
+    expected_range:
+      min: 0.05
+      max: 0.15
+    description: Expected proportion of defaults in dataset
+  
+  evaluation_metrics:
+    primary: roc_auc
+    secondary:
+      - accuracy
+      - precision
+      - recall
+      - f1_score
+  
+  threshold:
+    default: 0.5
+    description: Default probability threshold for classification
