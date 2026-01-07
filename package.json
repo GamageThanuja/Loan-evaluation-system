@@ -1,0 +1,30 @@
+{
+  "name": "loan-approval-system",
+  "version": "2.0.0",
+  "description": "Home Credit Loan Approval System - All Services",
+  "scripts": {
+    "install:all": "npm install && cd frontend && npm install && cd ..",
+    "dev": "concurrently -n \"DB,BACKEND,FRONTEND\" -c \"cyan,yellow,green\" \"npm run dev:db\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:db": "echo '✅ Using Supabase Cloud or run: cd database && supabase start'",
+    "dev:backend": "cd backend && source venv/bin/activate && python api.py",
+    "dev:frontend": "cd frontend && npm run dev",
+    "setup": "npm run setup:backend && npm run setup:frontend && npm run setup:db",
+    "setup:backend": "cd backend && python -m venv venv && source venv/bin/activate && pip install -r requirements.txt",
+    "setup:frontend": "cd frontend && npm install",
+    "setup:db": "echo '📦 Database setup: 1) Create Supabase project at supabase.com OR 2) Run: cd database && supabase start'",
+    "build": "cd frontend && npm run build",
+    "start:prod": "concurrently -n \"BACKEND,FRONTEND\" -c \"yellow,green\" \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd backend && source venv/bin/activate && python api.py",
+    "start:frontend": "cd frontend && npm start",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && source venv/bin/activate && pytest",
+    "test:frontend": "cd frontend && npm test"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
