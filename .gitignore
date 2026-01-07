@@ -76,3 +76,12 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Supabase keys (IMPORTANT!)
+.env
+.env.local
+*.env
+
+# Old backup files
+*_old.*
+api_old.py
