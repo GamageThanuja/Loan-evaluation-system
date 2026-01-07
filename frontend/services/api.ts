@@ -16,9 +16,16 @@ const apiClient: AxiosInstance = axios.create({
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     // Add auth token if available
-    const user = storage.get('user', null) as { token?: string } | null;
-    if (user && config.headers) {
-      config.headers.Authorization = `Bearer ${user.token || 'mock-token'}`;
+    try {
+      const authStorage = localStorage.getItem('auth-storage');
+      if (authStorage) {
+        const { state } = JSON.parse(authStorage);
+        if (state?.token && config.headers) {
+          config.headers.Authorization = `Bearer ${state.token}`;
+        }
+      }
+    } catch (error) {
+      console.error('Error reading auth token:', error);
     }
     
     return config;
@@ -36,7 +43,7 @@ apiClient.interceptors.response.use(
   (error: AxiosError) => {
     // Handle 401 Unauthorized
     if (error.response?.status === 401) {
-      storage.remove('user');
+      localStorage.removeItem('auth-storage');
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
@@ -44,6 +51,7 @@ apiClient.interceptors.response.use(
     
     // Handle other errors
     const errorMessage = 
+      (error.response?.data as any)?.detail || 
       (error.response?.data as any)?.message || 
       error.message || 
       'An unexpected error occurred';

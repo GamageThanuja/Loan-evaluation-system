@@ -77,6 +77,53 @@ class SupabaseClient:
             logger.error(f"Error creating user: {e}")
             return None
     
+    def update_user_last_login(self, user_id: str) -> None:
+        """Update user's last login timestamp"""
+        try:
+            from datetime import datetime
+            self.client.table("users").update({
+                "last_login": datetime.utcnow().isoformat()
+            }).eq("id", user_id).execute()
+        except Exception as e:
+            logger.error(f"Error updating last login: {e}")
+    
+    def update_user_reset_token(
+        self,
+        user_id: str,
+        reset_token: str,
+        expires_at: str
+    ) -> None:
+        """Update user's password reset token"""
+        try:
+            self.client.table("users").update({
+                "reset_token": reset_token,
+                "reset_token_expires": expires_at
+            }).eq("id", user_id).execute()
+            logger.info(f"✅ Reset token set for user: {user_id}")
+        except Exception as e:
+            logger.error(f"Error updating reset token: {e}")
+    
+    def get_user_by_reset_token(self, reset_token: str) -> Optional[Dict[str, Any]]:
+        """Get user by reset token"""
+        try:
+            response = self.client.table("users").select("*").eq("reset_token", reset_token).single().execute()
+            return response.data
+        except Exception as e:
+            logger.error(f"Error getting user by reset token: {e}")
+            return None
+    
+    def update_user_password(self, user_id: str, password_hash: str) -> None:
+        """Update user password and clear reset token"""
+        try:
+            self.client.table("users").update({
+                "password_hash": password_hash,
+                "reset_token": None,
+                "reset_token_expires": None
+            }).eq("id", user_id).execute()
+            logger.info(f"✅ Password updated for user: {user_id}")
+        except Exception as e:
+            logger.error(f"Error updating password: {e}")
+    
     # ============================================
     # APPLICANT METHODS
     # ============================================

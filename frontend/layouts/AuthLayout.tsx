@@ -28,10 +28,10 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             gutterBottom
             sx={{ color: 'white', fontWeight: 700 }}
           >
-            Home Credit
+            LoanWise
           </Typography>
           <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.9)' }}>
-            Loan Approval System
+            Smart Loan Evaluation
           </Typography>
         </Box>
         <Paper

@@ -3,14 +3,18 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'loan_officer' | 'bank_manager';
+  role: 'loan_officer' | 'manager';
+  phone?: string;
+  is_active?: boolean;
+  created_at?: string;
+  last_login?: string;
   avatar?: string;
 }
 
 export interface LoginCredentials {
   email: string;
   password: string;
-  role: 'loan_officer' | 'bank_manager';
+  role?: 'loan_officer' | 'manager';
 }
 
 // Applicant & Application

@@ -81,7 +81,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     <Box>
       <Toolbar sx={{ bgcolor: 'primary.main', color: 'white' }}>
         <Typography variant="h6" noWrap component="div" fontWeight={700}>
-          Home Credit
+          LoanWise
         </Typography>
       </Toolbar>
       <Divider />

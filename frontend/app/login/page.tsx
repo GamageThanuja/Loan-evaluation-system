@@ -15,13 +15,14 @@ import {
 } from '@mui/material';
 import { LoginOutlined } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import AuthLayout from '@/layouts/AuthLayout';
 import { loginSchema, type LoginFormData } from '@/lib/validation';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, error: authError, clearError } = useAuth();
   
   const [formData, setFormData] = useState<LoginFormData>({
     email: '',
@@ -42,12 +43,17 @@ export default function LoginPage() {
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
+    if (error || authError) {
+      setError(null);
+      clearError();
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
     setErrors({});
+    clearError();
 
     // Validate form
     const result = loginSchema.safeParse(formData);
@@ -79,12 +85,12 @@ export default function LoginPage() {
           Sign In
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
-          Enter your credentials to access the system
+          Enter your credentials to access LoanWise
         </Typography>
 
-        {error && (
+        {(error || authError) && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
+            {error || authError}
           </Alert>
         )}
 
@@ -123,7 +129,7 @@ export default function LoginPage() {
             disabled={isLoading}
           >
             <MenuItem value="loan_officer">Loan Officer</MenuItem>
-            <MenuItem value="bank_manager">Bank Manager</MenuItem>
+            <MenuItem value="manager">Manager</MenuItem>
           </Select>
           {errors.role && (
             <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 2 }}>
@@ -144,6 +150,17 @@ export default function LoginPage() {
           {isLoading ? 'Signing in...' : 'Sign In'}
         </Button>
 
+        <Box sx={{ textAlign: 'center', mt: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            Don't have an account?{' '}
+            <Link href="/register" passHref legacyBehavior>
+              <Box component="span" sx={{ color: 'primary.main', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>
+                Sign Up
+              </Box>
+            </Link>
+          </Typography>
+        </Box>
+
         <Box
           sx={{
             p: 2,
@@ -153,16 +170,16 @@ export default function LoginPage() {
           }}
         >
           <Typography variant="caption" fontWeight={600} display="block" gutterBottom>
-            Demo Credentials
+            Getting Started
           </Typography>
           <Typography variant="caption" display="block">
-            Email: any email
+            New user? Click "Sign Up" above to create an account
           </Typography>
           <Typography variant="caption" display="block">
-            Password: any password (min 6 characters)
+            Already registered? Enter your email and password
           </Typography>
           <Typography variant="caption" display="block">
-            Role: Select Loan Officer or Bank Manager
+            Select your role: Loan Officer or Manager
           </Typography>
         </Box>
       </Box>

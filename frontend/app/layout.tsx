@@ -19,7 +19,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (mounted && !isAuthenticated && pathname !== '/login') {
+    if (mounted && !isAuthenticated && pathname !== '/login' && pathname !== '/register') {
       router.push('/login');
     }
   }, [isAuthenticated, pathname, router, mounted]);
@@ -29,8 +29,8 @@ function AppContent({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  // Auth layout for login page
-  if (pathname === '/login') {
+  // Auth layout for login and register pages
+  if (pathname === '/login' || pathname === '/register') {
     return children;
   }
 

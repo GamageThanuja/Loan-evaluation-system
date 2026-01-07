@@ -6,10 +6,13 @@ Integrates ML models, Supabase database, and middleware
 import sys
 from pathlib import Path
 
-# Add paths
-sys.path.insert(0, str(Path(__file__).parent))
-sys.path.insert(0, str(Path(__file__).parent.parent / "middleware"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "database"))
+# Add paths to Python path
+backend_dir = Path(__file__).parent
+project_root = backend_dir.parent
+
+sys.path.insert(0, str(backend_dir))
+sys.path.insert(0, str(project_root / "middleware"))
+sys.path.insert(0, str(project_root / "database"))
 
 from fastapi import FastAPI, HTTPException, Depends, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,7 +22,11 @@ import os
 from dotenv import load_dotenv
 import logging
 
+# Load environment variables first
+load_dotenv(project_root / ".env")
+
 # Import middleware
+sys.path.insert(0, str(project_root))
 from middleware.auth import AuthMiddleware, auth_middleware, hash_password, verify_password
 from middleware.logging_middleware import logging_middleware, setup_logging
 from middleware.error_handler import setup_error_handlers
@@ -27,8 +34,8 @@ from middleware.error_handler import setup_error_handlers
 # Import database client
 from database.client import db
 
-# Load environment variables
-load_dotenv()
+# Import routers
+from routers import auth as auth_module
 
 # Setup logging
 setup_logging(
@@ -39,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize FastAPI
 app = FastAPI(
-    title="Home Credit Loan Approval API",
+    title="LoanWise API",
     description="ML-powered loan approval system with explainable AI",
     version="2.0.0",
     docs_url="/docs",
@@ -63,17 +70,15 @@ app.middleware("http")(auth_middleware)
 setup_error_handlers(app)
 
 # ============================================
-# PYDANTIC MODELS
+# MOUNT ROUTERS
 # ============================================
 
-class LoginRequest(BaseModel):
-    email: str = Field(..., description="User email")
-    password: str = Field(..., description="User password")
+# Mount authentication router
+app.include_router(auth_module.router)
 
-class LoginResponse(BaseModel):
-    success: bool
-    token: str
-    user: Dict
+# ============================================
+# PYDANTIC MODELS
+# ============================================
 
 class ApplicantCreate(BaseModel):
     name: str
@@ -94,66 +99,6 @@ class PredictionRequest(BaseModel):
 class ApproveRejectRequest(BaseModel):
     notes: Optional[str] = None
     reason: Optional[str] = None
-
-# ============================================
-# AUTHENTICATION ENDPOINTS
-# ============================================
-
-@app.post("/api/auth/login", response_model=LoginResponse)
-async def login(credentials: LoginRequest):
-    """User login endpoint"""
-    try:
-        # Get user from database
-        user = db.get_user_by_email(credentials.email)
-        
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password"
-            )
-        
-        # Verify password
-        if not verify_password(credentials.password, user["password_hash"]):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password"
-            )
-        
-        # Create token
-        token_data = {
-            "sub": user["id"],
-            "email": user["email"],
-            "name": user["name"],
-            "role": user["role"]
-        }
-        token = AuthMiddleware.create_access_token(token_data)
-        
-        # Log action
-        db.log_action(
-            user_id=user["id"],
-            action="LOGIN",
-            resource_type="auth",
-            details={"success": True}
-        )
-        
-        return {
-            "success": True,
-            "token": token,
-            "user": {
-                "id": user["id"],
-                "email": user["email"],
-                "name": user["name"],
-                "role": user["role"]
-            }
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Login error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Login failed"
-        )
 
 # ============================================
 # APPLICANT ENDPOINTS

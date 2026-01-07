@@ -34,6 +34,11 @@ venv.bak/
 .ipynb_checkpoints
 *.ipynb
 
+# Next.js
+.next/
+out/
+node_modules/
+
 # IDEs
 .vscode/
 .idea/
