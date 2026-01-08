@@ -22,6 +22,7 @@ import {
   Cancel,
   Person,
   AttachMoney,
+  History,
 } from '@mui/icons-material';
 import { useRouter, useParams } from 'next/navigation';
 import { useApplicant, usePrediction, useApproveLoan, useRejectLoan } from '@/hooks/usePrediction';
@@ -38,12 +39,12 @@ export default function ApplicantDetailPage() {
   const params = useParams();
   const applicantId = params.id as string;
   const { isManager } = useAuth();
-  
+
   const { data: applicant, isLoading: applicantLoading } = useApplicant(applicantId);
   const { data: prediction, isLoading: predictionLoading } = usePrediction(applicantId);
   const approveLoan = useApproveLoan();
   const rejectLoan = useRejectLoan();
-  
+
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -74,7 +75,7 @@ export default function ApplicantDetailPage() {
 
   const handleReject = async () => {
     if (!rejectReason.trim()) return;
-    
+
     try {
       await rejectLoan.mutateAsync({ applicantId, reason: rejectReason });
       setRejectDialogOpen(false);
@@ -105,8 +106,8 @@ export default function ApplicantDetailPage() {
               applicant.status === 'approved'
                 ? 'success'
                 : applicant.status === 'rejected'
-                ? 'error'
-                : 'warning'
+                  ? 'error'
+                  : 'warning'
             }
           />
         </Box>
@@ -118,8 +119,8 @@ export default function ApplicantDetailPage() {
           prediction.decision === 'APPROVE'
             ? 'success'
             : prediction.decision === 'REJECT'
-            ? 'error'
-            : 'warning'
+              ? 'error'
+              : 'warning'
         }
         sx={{ mb: 3 }}
       >
@@ -130,10 +131,46 @@ export default function ApplicantDetailPage() {
           {prediction.decision === 'APPROVE'
             ? 'The model recommends approving this loan application.'
             : prediction.decision === 'REJECT'
-            ? 'The model recommends rejecting this loan application.'
-            : 'This application requires manual review by a loan officer.'}
+              ? 'The model recommends rejecting this loan application.'
+              : 'This application requires manual review by a loan officer.'}
         </Typography>
       </Alert>
+
+      {/* View Detailed Information Button */}
+      <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Typography variant="h6" fontWeight={600} sx={{ color: 'white', mb: 0.5 }}>
+                View Comprehensive Loan Details
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                Access repayment history, credit history, transactions, and complete audit trail
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              size="large"
+              startIcon={<History />}
+              onClick={() => router.push(`/applicant/${applicantId}/details`)}
+              sx={{
+                bgcolor: 'white',
+                color: '#667eea',
+                fontWeight: 600,
+                px: 3,
+                '&:hover': {
+                  bgcolor: 'rgba(255, 255, 255, 0.9)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: 3,
+                },
+                transition: 'all 0.2s',
+              }}
+            >
+              View Details
+            </Button>
+          </Box>
+        </CardContent>
+      </Card>
 
       <Grid container spacing={3}>
         {/* Applicant Info */}

@@ -160,28 +160,6 @@ export default function LoginPage() {
             </Link>
           </Typography>
         </Box>
-
-        <Box
-          sx={{
-            p: 2,
-            bgcolor: 'info.light',
-            borderRadius: 2,
-            color: 'info.contrastText',
-          }}
-        >
-          <Typography variant="caption" fontWeight={600} display="block" gutterBottom>
-            Getting Started
-          </Typography>
-          <Typography variant="caption" display="block">
-            New user? Click "Sign Up" above to create an account
-          </Typography>
-          <Typography variant="caption" display="block">
-            Already registered? Enter your email and password
-          </Typography>
-          <Typography variant="caption" display="block">
-            Select your role: Loan Officer or Manager
-          </Typography>
-        </Box>
       </Box>
     </AuthLayout>
   );

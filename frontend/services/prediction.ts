@@ -12,6 +12,7 @@ import {
   BatchPrediction,
   ApiResponse,
   PaginatedResponse,
+  LoanApplicationDetails,
 } from '@/types';
 import { generateId, calculateAge } from '@/lib/utils';
 
@@ -185,7 +186,7 @@ const mockPredictionResult: PredictionResult = {
 // API Service Methods
 export const predictionService = {
   // Create prediction
-  createPrediction: async (request: PredictionRequest): Promise<ApiResponse<PredictionResult>> => {
+  createPrediction: async (_request: PredictionRequest): Promise<ApiResponse<PredictionResult>> => {
     try {
       // Mock implementation - replace with actual API call
       // const response = await apiClient.post('/api/predict', request);
@@ -206,7 +207,7 @@ export const predictionService = {
   },
 
   // Get prediction by ID
-  getPrediction: async (id: string): Promise<ApiResponse<PredictionResult>> => {
+  getPrediction: async (_id: string): Promise<ApiResponse<PredictionResult>> => {
     try {
       // const response = await apiClient.get(`/api/predictions/${id}`);
       
@@ -225,7 +226,7 @@ export const predictionService = {
   },
 
   // Get recent predictions
-  getRecentPredictions: async (limit: number = 5): Promise<ApiResponse<RecentPrediction[]>> => {
+  getRecentPredictions: async (_limit: number = 5): Promise<ApiResponse<RecentPrediction[]>> => {
     try {
       // const response = await apiClient.get(`/api/predictions/recent?limit=${limit}`);
       
@@ -363,7 +364,7 @@ export const predictionService = {
   },
 
   // Approve loan
-  approveLoan: async (applicantId: string, notes?: string): Promise<ApiResponse<void>> => {
+  approveLoan: async (_applicantId: string, _notes?: string): Promise<ApiResponse<void>> => {
     try {
       // const response = await apiClient.post(`/api/applicants/${applicantId}/approve`, { notes });
       
@@ -382,7 +383,7 @@ export const predictionService = {
   },
 
   // Reject loan
-  rejectLoan: async (applicantId: string, reason: string): Promise<ApiResponse<void>> => {
+  rejectLoan: async (_applicantId: string, _reason: string): Promise<ApiResponse<void>> => {
     try {
       // const response = await apiClient.post(`/api/applicants/${applicantId}/reject`, { reason });
       
@@ -544,6 +545,23 @@ export const predictionService = {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to export data',
+      };
+    }
+  },
+
+  // Get loan application details
+  getLoanApplicationDetails: async (applicantId: string): Promise<ApiResponse<LoanApplicationDetails>> => {
+    try {
+      const response = await apiClient.get(`/api/loan-details/${applicantId}`);
+      
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch loan application details',
       };
     }
   },

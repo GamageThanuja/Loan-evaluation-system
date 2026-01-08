@@ -25,6 +25,14 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Import routers
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from routers.loan_details import router as loan_details_router
+
+# Include routers
+app.include_router(loan_details_router)
+
 # Add CORS
 app.add_middleware(
     CORSMiddleware,

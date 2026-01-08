@@ -48,7 +48,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { user, logout } = useAuth();
   const { darkMode, toggleDarkMode } = useThemeContext();
-  
+
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
@@ -189,7 +189,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </MenuItem>
             <MenuItem disabled>
               <Typography variant="caption" color="text.secondary">
-                {user?.role === 'bank_manager' ? 'Bank Manager' : 'Loan Officer'}
+                {user?.role === 'manager' ? 'Manager' : 'Loan Officer'}
               </Typography>
             </MenuItem>
             <Divider />

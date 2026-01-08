@@ -254,7 +254,7 @@ export interface ApplicantFormData {
 export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 export type DecisionType = 'APPROVE' | 'REJECT' | 'MANUAL_REVIEW';
 export type ApplicantStatus = 'pending' | 'approved' | 'rejected' | 'under_review';
-export type UserRole = 'loan_officer' | 'bank_manager';
+export type UserRole = 'loan_officer' | 'manager';
 
 // Utility Types
 export interface SelectOption {
@@ -274,4 +274,135 @@ export interface TableColumn<T> {
   minWidth?: number;
   align?: 'left' | 'right' | 'center';
   format?: (value: any) => string;
+}
+
+// Audit Trail
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  action: 'created' | 'updated' | 'status_changed' | 'reviewed' | 'approved' | 'rejected' | 'payment_made' | 'document_uploaded' | 'note_added';
+  performedBy: {
+    id: string;
+    name: string;
+    role: UserRole;
+  };
+  description: string;
+  changes?: {
+    field: string;
+    oldValue: string;
+    newValue: string;
+  }[];
+  metadata?: Record<string, any>;
+}
+
+// Repayment History
+export interface RepaymentSchedule {
+  id: string;
+  loanId: string;
+  installmentNumber: number;
+  dueDate: string;
+  principalAmount: number;
+  interestAmount: number;
+  totalAmount: number;
+  status: 'pending' | 'paid' | 'overdue' | 'partial';
+  paidAmount?: number;
+  paidDate?: string;
+  lateFee?: number;
+  remainingBalance: number;
+}
+
+export interface RepaymentSummary {
+  totalLoanAmount: number;
+  totalPaid: number;
+  totalRemaining: number;
+  totalInterest: number;
+  nextPaymentDue: string;
+  nextPaymentAmount: number;
+  overdueAmount: number;
+  numberOfPayments: number;
+  paymentsCompleted: number;
+  paymentStatus: 'on_time' | 'late' | 'defaulted' | 'completed';
+}
+
+// Credit History
+export interface CreditHistoryEntry {
+  id: string;
+  date: string;
+  creditScore: number;
+  bureau: 'Experian' | 'Equifax' | 'TransUnion';
+  reason?: string;
+  change?: number;
+}
+
+export interface CreditProfile {
+  currentScore: number;
+  scoreHistory: CreditHistoryEntry[];
+  creditUtilization: number;
+  totalCreditLines: number;
+  oldestAccount: string;
+  recentInquiries: number;
+  delinquencies: number;
+  publicRecords: number;
+  averageAccountAge: number;
+}
+
+// Transactions
+export interface Transaction {
+  id: string;
+  date: string;
+  type: 'payment' | 'disbursement' | 'fee' | 'refund' | 'adjustment' | 'penalty';
+  amount: number;
+  description: string;
+  status: 'completed' | 'pending' | 'failed' | 'reversed';
+  paymentMethod?: 'bank_transfer' | 'card' | 'cash' | 'check' | 'online';
+  referenceNumber?: string;
+  balance: number;
+  notes?: string;
+}
+
+export interface TransactionSummary {
+  totalTransactions: number;
+  totalDebits: number;
+  totalCredits: number;
+  lastTransaction?: Transaction;
+  monthlyTransactions: {
+    month: string;
+    count: number;
+    amount: number;
+  }[];
+}
+
+// Loan Application Details
+export interface LoanApplicationDetails extends Applicant {
+  // Loan specific details
+  interestRate: number;
+  monthlyPayment: number;
+  totalPayable: number;
+  disbursementDate?: string;
+  maturityDate?: string;
+  
+  // Related data
+  auditLog: AuditLogEntry[];
+  repaymentSchedule: RepaymentSchedule[];
+  repaymentSummary: RepaymentSummary;
+  creditProfile: CreditProfile;
+  transactions: Transaction[];
+  transactionSummary: TransactionSummary;
+  
+  // Documents
+  documents?: {
+    id: string;
+    name: string;
+    type: string;
+    uploadedAt: string;
+    url: string;
+  }[];
+  
+  // Notes
+  notes?: {
+    id: string;
+    content: string;
+    createdBy: string;
+    createdAt: string;
+  }[];
 }
