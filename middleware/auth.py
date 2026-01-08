@@ -69,23 +69,35 @@ class AuthMiddleware:
     
     @staticmethod
     def require_role(allowed_roles: list):
-        """Decorator to require specific roles"""
-        async def role_checker(request: Request):
-            user = getattr(request.state, "user", None)
-            
-            if not user:
+        """Dependency to require specific roles"""
+        from fastapi import Depends
+        
+        async def role_checker(credentials: HTTPAuthorizationCredentials = Depends(security)):
+            if not credentials:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Authentication required"
+                    detail="Authentication required",
+                    headers={"WWW-Authenticate": "Bearer"},
                 )
             
-            if user.get("role") not in allowed_roles:
+            token = credentials.credentials
+            payload = AuthMiddleware.verify_token(token)
+            
+            if not payload:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid or expired token",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            
+            user_role = payload.get("role")
+            if user_role not in allowed_roles:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"Access denied. Required roles: {', '.join(allowed_roles)}"
                 )
             
-            return user
+            return payload
         
         return role_checker
 

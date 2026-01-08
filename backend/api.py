@@ -16,11 +16,15 @@ sys.path.insert(0, str(project_root / "database"))
 
 from fastapi import FastAPI, HTTPException, Depends, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
 import os
 from dotenv import load_dotenv
 import logging
+
+# Security scheme for Swagger
+security = HTTPBearer()
 
 # Load environment variables first
 load_dotenv(project_root / ".env")
@@ -53,6 +57,37 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Add security scheme to OpenAPI schema
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    from fastapi.openapi.utils import get_openapi
+    openapi_schema = get_openapi(
+        title="LoanWise API",
+        version="2.0.0",
+        description="ML-powered loan approval system with explainable AI",
+        routes=app.routes,
+    )
+    
+    # Add security scheme
+    openapi_schema["components"]["securitySchemes"] = {
+        "HTTPBearer": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "Enter your JWT token from /api/auth/login"
+        }
+    }
+    
+    # Apply security globally to all endpoints (Swagger will send the token)
+    openapi_schema["security"] = [{"HTTPBearer": []}]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # Setup CORS
 app.add_middleware(
