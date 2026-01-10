@@ -15,6 +15,9 @@ import {
   DialogActions,
   TextField,
   Alert,
+  Tabs,
+  Tab,
+  Paper,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -23,6 +26,9 @@ import {
   Person,
   AttachMoney,
   History,
+  Assessment,
+  Psychology,
+  Lightbulb,
 } from '@mui/icons-material';
 import { useRouter, useParams } from 'next/navigation';
 import { useApplicant, usePrediction, useApproveLoan, useRejectLoan } from '@/hooks/usePrediction';
@@ -32,6 +38,9 @@ import RiskGauge from '@/components/prediction/RiskGauge';
 import ShapExplanation from '@/components/prediction/ShapExplanation';
 import BayesianNetworkDisplay from '@/components/prediction/BayesianNetworkDisplay';
 import BusinessRules from '@/components/prediction/BusinessRules';
+import RiskAssessment from '@/components/loan/RiskAssessment';
+import BayesianReasoning from '@/components/loan/BayesianReasoning';
+import MitigationSuggestions from '@/components/loan/MitigationSuggestions';
 import { formatCurrency, getRiskLevel } from '@/lib/utils';
 
 export default function ApplicantDetailPage() {
@@ -48,6 +57,7 @@ export default function ApplicantDetailPage() {
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [activeTab, setActiveTab] = useState(0);
 
   if (applicantLoading || predictionLoading) {
     return <DetailSkeleton />;
@@ -281,28 +291,59 @@ export default function ApplicantDetailPage() {
           </Card>
         </Grid>
 
-        {/* Risk Gauge */}
-        <Grid item xs={12} md={4}>
-          <RiskGauge
-            riskScore={prediction.riskScore}
-            riskLevel={riskLevel}
-            confidence={prediction.confidence}
-          />
-        </Grid>
-
-        {/* SHAP Explanation */}
-        <Grid item xs={12} md={8}>
-          <ShapExplanation explanation={prediction.shapExplanation} />
-        </Grid>
-
-        {/* Bayesian Network */}
+        {/* Tabbed Interface for Risk Analysis */}
         <Grid item xs={12}>
-          <BayesianNetworkDisplay network={prediction.bayesianNetwork} />
-        </Grid>
+          <Paper>
+            <Tabs
+              value={activeTab}
+              onChange={(_e, newValue) => setActiveTab(newValue)}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{
+                borderBottom: 1,
+                borderColor: 'divider',
+                px: 2,
+              }}
+            >
+              <Tab icon={<Assessment />} iconPosition="start" label="Risk Assessment" />
+              <Tab icon={<Psychology />} iconPosition="start" label="Reasoning" />
+              <Tab icon={<Lightbulb />} iconPosition="start" label="Suggestions" />
+            </Tabs>
 
-        {/* Business Rules */}
-        <Grid item xs={12}>
-          <BusinessRules rules={prediction.businessRules} />
+            <Box sx={{ p: 3 }}>
+              {/* Tab 1: Risk Assessment */}
+              {activeTab === 0 && (
+                <RiskAssessment
+                  riskScore={prediction.riskScore}
+                  riskLevel={riskLevel as 'LOW' | 'MEDIUM' | 'HIGH'}
+                  confidence={prediction.confidence}
+                  decision={prediction.decision}
+                />
+              )}
+
+              {/* Tab 2: Reasoning */}
+              {activeTab === 1 && (
+                <BayesianReasoning
+                  bayesianNetwork={prediction.bayesianNetwork}
+                  shapExplanation={prediction.shapExplanation}
+                  decision={prediction.decision}
+                  riskScore={prediction.riskScore}
+                />
+              )}
+
+              {/* Tab 3: Suggestions */}
+              {activeTab === 2 && (
+                <MitigationSuggestions
+                  riskScore={prediction.riskScore}
+                  decision={prediction.decision}
+                  creditScore={applicant.creditScore}
+                  debtToIncomeRatio={0.28}
+                  employmentLength={applicant.employmentLength}
+                  businessRules={prediction.businessRules}
+                />
+              )}
+            </Box>
+          </Paper>
         </Grid>
 
         {/* Manager Actions */}

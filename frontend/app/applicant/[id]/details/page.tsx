@@ -244,7 +244,7 @@ export default function LoanApplicationDetails() {
     const [activeTab, setActiveTab] = useState(0);
 
     // Fetch data using hooks
-    const { data: applicant, isLoading: isLoadingApplicant, error: applicantError } = useApplicant(applicantId);
+    const { data: applicant, isLoading: isLoadingApplicant } = useApplicant(applicantId);
     const { data: loanDetails, isLoading: isLoadingLoanDetails } = useLoanDetails(applicantId);
     const { data: creditHistory, isLoading: isLoadingCredit } = useCreditHistory(applicantId);
     const { data: repaymentHistory, isLoading: isLoadingRepayment } = useRepaymentHistory(applicantId);
@@ -254,9 +254,9 @@ export default function LoanApplicationDetails() {
     const displayData = applicant || mockLoanData;
     const displayLoanDetails = loanDetails || mockLoanData;
     const displayCreditHistory = creditHistory || mockLoanData.creditProfile;
-    const displayRepaymentHistory = repaymentHistory || { 
-        schedule: mockLoanData.repaymentSchedule, 
-        summary: mockLoanData.repaymentSummary 
+    const displayRepaymentHistory = repaymentHistory || {
+        schedule: mockLoanData.repaymentSchedule,
+        summary: mockLoanData.repaymentSummary
     };
     const displayAuditLog = auditLog || mockLoanData.auditLog;
     const displayTransactions = loanDetails?.transactions || mockLoanData.transactions;
@@ -300,13 +300,13 @@ export default function LoanApplicationDetails() {
 
     const getEligibilityInfo = () => {
         if (!applicant) return null;
-        
+
         const eligibilityStatus = (applicant as any).eligibilityStatus;
         const eligibilityReasons = (applicant as any).eligibilityReasons;
         const riskScore = (applicant as any).riskScore;
-        
+
         if (!eligibilityStatus || eligibilityStatus === 'not_checked') return null;
-        
+
         return (
             <Card sx={{ mb: 2, bgcolor: eligibilityStatus === 'eligible' ? 'success.light' : 'error.light' }}>
                 <CardContent>
@@ -316,7 +316,7 @@ export default function LoanApplicationDetails() {
                             Eligibility Assessment
                         </Typography>
                     </Box>
-                    
+
                     <Grid container spacing={2}>
                         <Grid item xs={12} sm={4}>
                             <Typography variant="caption" color="text.secondary">Status</Typography>
@@ -329,7 +329,7 @@ export default function LoanApplicationDetails() {
                                 />
                             </Box>
                         </Grid>
-                        
+
                         {riskScore !== undefined && (
                             <Grid item xs={12} sm={4}>
                                 <Typography variant="caption" color="text.secondary">Risk Score</Typography>
@@ -338,7 +338,7 @@ export default function LoanApplicationDetails() {
                                 </Typography>
                             </Grid>
                         )}
-                        
+
                         {eligibilityReasons && eligibilityReasons.length > 0 && (
                             <Grid item xs={12}>
                                 <Typography variant="caption" color="text.secondary">
