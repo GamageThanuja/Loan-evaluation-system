@@ -21,6 +21,8 @@ import {
   Switch,
   useTheme,
   useMediaQuery,
+  Collapse,
+  Chip,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -31,6 +33,12 @@ import {
   PersonAdd,
   Brightness4,
   Brightness7,
+  AccountBalance,
+  ExpandLess,
+  ExpandMore,
+  Settings,
+  VerifiedUser,
+  RateReview,
 } from '@mui/icons-material';
 import { useAuth } from '@/hooks/useAuth';
 import { useThemeContext } from '@/components/Providers';
@@ -46,11 +54,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const { user, logout } = useAuth();
+  const { user, logout, isManager } = useAuth();
   const { darkMode, toggleDarkMode } = useThemeContext();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [loansExpanded, setLoansExpanded] = useState(true);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -70,54 +79,207 @@ export default function MainLayout({ children }: MainLayoutProps) {
     handleProfileMenuClose();
   };
 
-  const menuItems = [
-    { text: 'Dashboard', icon: <Dashboard />, path: '/' },
-    { text: 'Applicants', icon: <People />, path: '/applicant' },
-    { text: 'New Application', icon: <PersonAdd />, path: '/applicant/new' },
-    { text: 'Reports', icon: <Assessment />, path: '/reports' },
-  ];
+  const handleLoansClick = () => {
+    setLoansExpanded(!loansExpanded);
+  };
+
+  const isLoansPath = pathname.startsWith('/applicant');
 
   const drawer = (
-    <Box>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Toolbar sx={{ bgcolor: 'primary.main', color: 'white' }}>
         <Typography variant="h6" noWrap component="div" fontWeight={700}>
           LoanWise
         </Typography>
       </Toolbar>
       <Divider />
-      <List>
-        {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding>
+      <List sx={{ flexGrow: 1 }}>
+        {/* Dashboard */}
+        <ListItem disablePadding>
+          <ListItemButton
+            selected={pathname === '/'}
+            onClick={() => {
+              router.push('/');
+              if (isMobile) setMobileOpen(false);
+            }}
+            sx={{
+              '&.Mui-selected': {
+                bgcolor: 'primary.light',
+                color: 'primary.contrastText',
+                '&:hover': { bgcolor: 'primary.light' },
+                '& .MuiListItemIcon-root': { color: 'primary.contrastText' },
+              },
+            }}
+          >
+            <ListItemIcon sx={{ color: pathname === '/' ? 'inherit' : 'text.secondary' }}>
+              <Dashboard />
+            </ListItemIcon>
+            <ListItemText primary="Dashboard" />
+          </ListItemButton>
+        </ListItem>
+
+        {/* Loans Section */}
+        <ListItem disablePadding>
+          <ListItemButton
+            onClick={handleLoansClick}
+            sx={{
+              bgcolor: isLoansPath ? 'action.selected' : 'transparent',
+            }}
+          >
+            <ListItemIcon sx={{ color: isLoansPath ? 'primary.main' : 'text.secondary' }}>
+              <AccountBalance />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Loans" 
+              primaryTypographyProps={{ fontWeight: isLoansPath ? 600 : 400 }}
+            />
+            {loansExpanded ? <ExpandLess /> : <ExpandMore />}
+          </ListItemButton>
+        </ListItem>
+        
+        <Collapse in={loansExpanded} timeout="auto" unmountOnExit>
+          <List component="div" disablePadding>
+            {/* New Applicant */}
+            <ListItem disablePadding>
+              <ListItemButton
+                sx={{ pl: 4 }}
+                selected={pathname === '/applicant/new'}
+                onClick={() => {
+                  router.push('/applicant/new');
+                  if (isMobile) setMobileOpen(false);
+                }}
+              >
+                <ListItemIcon sx={{ color: pathname === '/applicant/new' ? 'primary.main' : 'text.secondary' }}>
+                  <PersonAdd fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="New Applicant" />
+              </ListItemButton>
+            </ListItem>
+
+            {/* All Applicants */}
+            <ListItem disablePadding>
+              <ListItemButton
+                sx={{ pl: 4 }}
+                selected={pathname === '/applicant' || (pathname.startsWith('/applicant/') && pathname !== '/applicant/new')}
+                onClick={() => {
+                  router.push('/applicant');
+                  if (isMobile) setMobileOpen(false);
+                }}
+              >
+                <ListItemIcon sx={{ color: pathname === '/applicant' ? 'primary.main' : 'text.secondary' }}>
+                  <People fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="All Applicants" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+        </Collapse>
+
+        {/* Eligibility - For Loan Officers */}
+        <ListItem disablePadding>
+          <ListItemButton
+            selected={pathname === '/eligibility'}
+            onClick={() => {
+              router.push('/eligibility');
+              if (isMobile) setMobileOpen(false);
+            }}
+            sx={{
+              '&.Mui-selected': {
+                bgcolor: 'primary.light',
+                color: 'primary.contrastText',
+                '&:hover': { bgcolor: 'primary.light' },
+                '& .MuiListItemIcon-root': { color: 'primary.contrastText' },
+              },
+            }}
+          >
+            <ListItemIcon sx={{ color: pathname === '/eligibility' ? 'inherit' : 'text.secondary' }}>
+              <VerifiedUser />
+            </ListItemIcon>
+            <ListItemText primary="Eligibility" />
+          </ListItemButton>
+        </ListItem>
+
+        {/* Review - For Bank Managers Only */}
+        {isManager && (
+          <ListItem disablePadding>
             <ListItemButton
-              selected={pathname === item.path}
+              selected={pathname === '/review'}
               onClick={() => {
-                router.push(item.path);
+                router.push('/review');
                 if (isMobile) setMobileOpen(false);
               }}
               sx={{
                 '&.Mui-selected': {
                   bgcolor: 'primary.light',
                   color: 'primary.contrastText',
-                  '&:hover': {
-                    bgcolor: 'primary.light',
-                  },
-                  '& .MuiListItemIcon-root': {
-                    color: 'primary.contrastText',
-                  },
+                  '&:hover': { bgcolor: 'primary.light' },
+                  '& .MuiListItemIcon-root': { color: 'primary.contrastText' },
                 },
               }}
             >
-              <ListItemIcon
-                sx={{
-                  color: pathname === item.path ? 'inherit' : 'text.secondary',
-                }}
-              >
-                {item.icon}
+              <ListItemIcon sx={{ color: pathname === '/review' ? 'inherit' : 'text.secondary' }}>
+                <RateReview />
               </ListItemIcon>
-              <ListItemText primary={item.text} />
+              <ListItemText primary="Review" />
+              <Chip 
+                label="Manager" 
+                size="small" 
+                color="secondary" 
+                sx={{ height: 20, fontSize: '0.65rem' }}
+              />
             </ListItemButton>
           </ListItem>
-        ))}
+        )}
+
+        {/* Reports */}
+        <ListItem disablePadding>
+          <ListItemButton
+            selected={pathname === '/reports'}
+            onClick={() => {
+              router.push('/reports');
+              if (isMobile) setMobileOpen(false);
+            }}
+            sx={{
+              '&.Mui-selected': {
+                bgcolor: 'primary.light',
+                color: 'primary.contrastText',
+                '&:hover': { bgcolor: 'primary.light' },
+                '& .MuiListItemIcon-root': { color: 'primary.contrastText' },
+              },
+            }}
+          >
+            <ListItemIcon sx={{ color: pathname === '/reports' ? 'inherit' : 'text.secondary' }}>
+              <Assessment />
+            </ListItemIcon>
+            <ListItemText primary="Reports" />
+          </ListItemButton>
+        </ListItem>
+
+        <Divider sx={{ my: 1 }} />
+
+        {/* Settings */}
+        <ListItem disablePadding>
+          <ListItemButton
+            selected={pathname.startsWith('/settings')}
+            onClick={() => {
+              router.push('/settings');
+              if (isMobile) setMobileOpen(false);
+            }}
+            sx={{
+              '&.Mui-selected': {
+                bgcolor: 'primary.light',
+                color: 'primary.contrastText',
+                '&:hover': { bgcolor: 'primary.light' },
+                '& .MuiListItemIcon-root': { color: 'primary.contrastText' },
+              },
+            }}
+          >
+            <ListItemIcon sx={{ color: pathname.startsWith('/settings') ? 'inherit' : 'text.secondary' }}>
+              <Settings />
+            </ListItemIcon>
+            <ListItemText primary="Settings" />
+          </ListItemButton>
+        </ListItem>
       </List>
       <Divider />
       <List>
@@ -157,14 +319,19 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Loan Approval System
+            Loan Evaluation System
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }}>
-              {user?.name}
-            </Typography>
+            <Box sx={{ display: { xs: 'none', sm: 'block' }, textAlign: 'right' }}>
+              <Typography variant="body2">
+                {user?.name}
+              </Typography>
+              <Typography variant="caption" color="inherit" sx={{ opacity: 0.8 }}>
+                {user?.role === 'manager' ? 'Bank Manager' : 'Loan Officer'}
+              </Typography>
+            </Box>
             <IconButton onClick={handleProfileMenuOpen} size="small">
-              <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
+              <Avatar sx={{ width: 36, height: 36, bgcolor: 'secondary.main' }}>
                 {user?.name?.charAt(0).toUpperCase()}
               </Avatar>
             </IconButton>
@@ -189,10 +356,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </MenuItem>
             <MenuItem disabled>
               <Typography variant="caption" color="text.secondary">
-                {user?.role === 'manager' ? 'Manager' : 'Loan Officer'}
+                {user?.role === 'manager' ? 'Bank Manager' : 'Loan Officer'}
               </Typography>
             </MenuItem>
             <Divider />
+            <MenuItem onClick={() => { router.push('/settings'); handleProfileMenuClose(); }}>
+              <ListItemIcon>
+                <Settings fontSize="small" />
+              </ListItemIcon>
+              Settings
+            </MenuItem>
             <MenuItem onClick={handleLogout}>
               <ListItemIcon>
                 <Logout fontSize="small" />

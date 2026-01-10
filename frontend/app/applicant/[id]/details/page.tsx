@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import {
     Box,
     Typography,
@@ -14,6 +15,9 @@ import {
     Button,
     Divider,
     Avatar,
+    CircularProgress,
+    Alert,
+    Skeleton,
 } from '@mui/material';
 import {
     ArrowBack,
@@ -22,14 +26,25 @@ import {
     Receipt,
     History,
     CreditScore as CreditScoreIcon,
+    CheckCircle,
+    Cancel,
+    Warning,
+    Pending,
+    Gavel,
 } from '@mui/icons-material';
-import { useRouter } from 'next/navigation';
 import AuditTrail from '@/components/loan/AuditTrail';
 import RepaymentHistory from '@/components/loan/RepaymentHistory';
 import CreditHistory from '@/components/loan/CreditHistory';
 import TransactionList from '@/components/loan/TransactionList';
+import {
+    useApplicant,
+    useLoanDetails,
+    useCreditHistory,
+    useRepaymentHistory,
+    useAuditTrail,
+} from '@/hooks/useApplicants';
 
-// Mock data - replace with actual API calls
+// Fallback mock data - used when API is not available
 const mockLoanData = {
     id: '1',
     firstName: 'John',
@@ -224,7 +239,27 @@ function TabPanel({ children, value, index }: TabPanelProps) {
 
 export default function LoanApplicationDetails() {
     const router = useRouter();
+    const params = useParams();
+    const applicantId = params.id as string;
     const [activeTab, setActiveTab] = useState(0);
+
+    // Fetch data using hooks
+    const { data: applicant, isLoading: isLoadingApplicant, error: applicantError } = useApplicant(applicantId);
+    const { data: loanDetails, isLoading: isLoadingLoanDetails } = useLoanDetails(applicantId);
+    const { data: creditHistory, isLoading: isLoadingCredit } = useCreditHistory(applicantId);
+    const { data: repaymentHistory, isLoading: isLoadingRepayment } = useRepaymentHistory(applicantId);
+    const { data: auditLog, isLoading: isLoadingAudit } = useAuditTrail(applicantId);
+
+    // Use API data if available, otherwise fall back to mock
+    const displayData = applicant || mockLoanData;
+    const displayLoanDetails = loanDetails || mockLoanData;
+    const displayCreditHistory = creditHistory || mockLoanData.creditProfile;
+    const displayRepaymentHistory = repaymentHistory || { 
+        schedule: mockLoanData.repaymentSchedule, 
+        summary: mockLoanData.repaymentSummary 
+    };
+    const displayAuditLog = auditLog || mockLoanData.auditLog;
+    const displayTransactions = loanDetails?.transactions || mockLoanData.transactions;
 
     const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
         setActiveTab(newValue);
@@ -250,6 +285,93 @@ export default function LoanApplicationDetails() {
         }
     };
 
+    const getStatusIcon = (status: string) => {
+        switch (status) {
+            case 'approved':
+                return <CheckCircle fontSize="small" />;
+            case 'rejected':
+                return <Cancel fontSize="small" />;
+            case 'under_review':
+                return <Pending fontSize="small" />;
+            default:
+                return <Warning fontSize="small" />;
+        }
+    };
+
+    const getEligibilityInfo = () => {
+        if (!applicant) return null;
+        
+        const eligibilityStatus = (applicant as any).eligibilityStatus;
+        const eligibilityReasons = (applicant as any).eligibilityReasons;
+        const riskScore = (applicant as any).riskScore;
+        
+        if (!eligibilityStatus || eligibilityStatus === 'not_checked') return null;
+        
+        return (
+            <Card sx={{ mb: 2, bgcolor: eligibilityStatus === 'eligible' ? 'success.light' : 'error.light' }}>
+                <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                        <Gavel />
+                        <Typography variant="h6" fontWeight={600}>
+                            Eligibility Assessment
+                        </Typography>
+                    </Box>
+                    
+                    <Grid container spacing={2}>
+                        <Grid item xs={12} sm={4}>
+                            <Typography variant="caption" color="text.secondary">Status</Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                <Chip
+                                    label={eligibilityStatus === 'eligible' ? 'Eligible' : 'Not Eligible'}
+                                    color={eligibilityStatus === 'eligible' ? 'success' : 'error'}
+                                    size="small"
+                                    icon={eligibilityStatus === 'eligible' ? <CheckCircle /> : <Cancel />}
+                                />
+                            </Box>
+                        </Grid>
+                        
+                        {riskScore !== undefined && (
+                            <Grid item xs={12} sm={4}>
+                                <Typography variant="caption" color="text.secondary">Risk Score</Typography>
+                                <Typography variant="h6" fontWeight={600} color={riskScore < 0.3 ? 'success.main' : riskScore < 0.6 ? 'warning.main' : 'error.main'}>
+                                    {(riskScore * 100).toFixed(1)}%
+                                </Typography>
+                            </Grid>
+                        )}
+                        
+                        {eligibilityReasons && eligibilityReasons.length > 0 && (
+                            <Grid item xs={12}>
+                                <Typography variant="caption" color="text.secondary">
+                                    {eligibilityStatus === 'eligible' ? 'Positive Factors' : 'Reasons for Ineligibility'}
+                                </Typography>
+                                <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                    {eligibilityReasons.map((reason: string, index: number) => (
+                                        <Chip
+                                            key={index}
+                                            label={reason}
+                                            size="small"
+                                            variant="outlined"
+                                            color={eligibilityStatus === 'eligible' ? 'success' : 'error'}
+                                        />
+                                    ))}
+                                </Box>
+                            </Grid>
+                        )}
+                    </Grid>
+                </CardContent>
+            </Card>
+        );
+    };
+
+    // Show loading state
+    if (isLoadingApplicant) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
     return (
         <Box>
             {/* Header */}
@@ -273,30 +395,31 @@ export default function LoanApplicationDetails() {
                                     fontSize: '2rem',
                                 }}
                             >
-                                {mockLoanData.firstName[0]}{mockLoanData.lastName[0]}
+                                {displayData.firstName[0]}{displayData.lastName[0]}
                             </Avatar>
                         </Grid>
 
                         <Grid item xs>
                             <Typography variant="h4" fontWeight={700} gutterBottom>
-                                {mockLoanData.firstName} {mockLoanData.lastName}
+                                {displayData.firstName} {displayData.lastName}
                             </Typography>
                             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
                                 <Chip
-                                    label={mockLoanData.status.toUpperCase().replace('_', ' ')}
-                                    color={getStatusColor(mockLoanData.status)}
+                                    label={displayData.status.toUpperCase().replace('_', ' ')}
+                                    color={getStatusColor(displayData.status)}
                                     size="small"
+                                    icon={getStatusIcon(displayData.status)}
                                 />
                                 <Chip
-                                    label={`Loan ID: ${mockLoanData.id}`}
+                                    label={`Loan ID: ${displayData.id}`}
                                     variant="outlined"
                                     size="small"
                                 />
                                 <Typography variant="body2" color="text.secondary">
-                                    {mockLoanData.email}
+                                    {displayData.email}
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
-                                    {mockLoanData.phone}
+                                    {displayData.phone}
                                 </Typography>
                             </Box>
                         </Grid>
@@ -312,7 +435,7 @@ export default function LoanApplicationDetails() {
                                     Loan Amount
                                 </Typography>
                                 <Typography variant="h6" fontWeight={600}>
-                                    {formatCurrency(mockLoanData.loanAmount)}
+                                    {formatCurrency(displayData.loanAmount)}
                                 </Typography>
                             </Box>
                         </Grid>
@@ -322,7 +445,7 @@ export default function LoanApplicationDetails() {
                                     Interest Rate
                                 </Typography>
                                 <Typography variant="h6" fontWeight={600}>
-                                    {mockLoanData.interestRate}%
+                                    {displayLoanDetails.interestRate}%
                                 </Typography>
                             </Box>
                         </Grid>
@@ -332,7 +455,7 @@ export default function LoanApplicationDetails() {
                                     Monthly Payment
                                 </Typography>
                                 <Typography variant="h6" fontWeight={600}>
-                                    {formatCurrency(mockLoanData.monthlyPayment)}
+                                    {formatCurrency(displayLoanDetails.monthlyPayment)}
                                 </Typography>
                             </Box>
                         </Grid>
@@ -342,13 +465,24 @@ export default function LoanApplicationDetails() {
                                     Credit Score
                                 </Typography>
                                 <Typography variant="h6" fontWeight={600} color="success.main">
-                                    {mockLoanData.creditScore}
+                                    {displayData.creditScore}
                                 </Typography>
                             </Box>
                         </Grid>
                     </Grid>
                 </Paper>
             </Box>
+
+            {/* Eligibility Assessment Card */}
+            {getEligibilityInfo()}
+
+            {/* Rejection Reason (if rejected) */}
+            {displayData.status === 'rejected' && (applicant as any)?.rejectionReason && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" fontWeight={600}>Rejection Reason:</Typography>
+                    <Typography variant="body2">{(applicant as any).rejectionReason}</Typography>
+                </Alert>
+            )}
 
             {/* Tabs */}
             <Paper>
@@ -382,19 +516,19 @@ export default function LoanApplicationDetails() {
                                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Date of Birth</Typography>
-                                                <Typography variant="body2">{new Date(mockLoanData.dateOfBirth).toLocaleDateString()}</Typography>
+                                                <Typography variant="body2">{new Date(displayData.dateOfBirth).toLocaleDateString()}</Typography>
                                             </Box>
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Age</Typography>
-                                                <Typography variant="body2">{mockLoanData.age} years</Typography>
+                                                <Typography variant="body2">{displayData.age} years</Typography>
                                             </Box>
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Marital Status</Typography>
-                                                <Typography variant="body2">{mockLoanData.maritalStatus}</Typography>
+                                                <Typography variant="body2">{displayData.maritalStatus}</Typography>
                                             </Box>
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Dependents</Typography>
-                                                <Typography variant="body2">{mockLoanData.dependents}</Typography>
+                                                <Typography variant="body2">{displayData.dependents}</Typography>
                                             </Box>
                                         </Box>
                                     </CardContent>
@@ -410,15 +544,15 @@ export default function LoanApplicationDetails() {
                                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Employment Type</Typography>
-                                                <Typography variant="body2">{mockLoanData.employmentType}</Typography>
+                                                <Typography variant="body2">{displayData.employmentType}</Typography>
                                             </Box>
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Employment Length</Typography>
-                                                <Typography variant="body2">{mockLoanData.employmentLength} years</Typography>
+                                                <Typography variant="body2">{displayData.employmentLength} years</Typography>
                                             </Box>
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Annual Income</Typography>
-                                                <Typography variant="body2" fontWeight={600}>{formatCurrency(mockLoanData.annualIncome)}</Typography>
+                                                <Typography variant="body2" fontWeight={600}>{formatCurrency(displayData.annualIncome)}</Typography>
                                             </Box>
                                         </Box>
                                     </CardContent>
@@ -434,24 +568,28 @@ export default function LoanApplicationDetails() {
                                         <Grid container spacing={2}>
                                             <Grid item xs={12} sm={6} md={4}>
                                                 <Typography variant="caption" color="text.secondary">Loan Purpose</Typography>
-                                                <Typography variant="body2">{mockLoanData.loanPurpose}</Typography>
+                                                <Typography variant="body2">{displayData.loanPurpose}</Typography>
                                             </Grid>
                                             <Grid item xs={12} sm={6} md={4}>
                                                 <Typography variant="caption" color="text.secondary">Loan Term</Typography>
-                                                <Typography variant="body2">{mockLoanData.loanTerm} months ({mockLoanData.loanTerm / 12} years)</Typography>
+                                                <Typography variant="body2">{displayData.loanTerm} months ({displayData.loanTerm / 12} years)</Typography>
                                             </Grid>
                                             <Grid item xs={12} sm={6} md={4}>
                                                 <Typography variant="caption" color="text.secondary">Total Payable</Typography>
-                                                <Typography variant="body2" fontWeight={600}>{formatCurrency(mockLoanData.totalPayable)}</Typography>
+                                                <Typography variant="body2" fontWeight={600}>{formatCurrency(displayLoanDetails.totalPayable)}</Typography>
                                             </Grid>
-                                            <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Disbursement Date</Typography>
-                                                <Typography variant="body2">{new Date(mockLoanData.disbursementDate!).toLocaleDateString()}</Typography>
-                                            </Grid>
-                                            <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Maturity Date</Typography>
-                                                <Typography variant="body2">{new Date(mockLoanData.maturityDate!).toLocaleDateString()}</Typography>
-                                            </Grid>
+                                            {displayLoanDetails.disbursementDate && (
+                                                <Grid item xs={12} sm={6} md={4}>
+                                                    <Typography variant="caption" color="text.secondary">Disbursement Date</Typography>
+                                                    <Typography variant="body2">{new Date(displayLoanDetails.disbursementDate!).toLocaleDateString()}</Typography>
+                                                </Grid>
+                                            )}
+                                            {displayLoanDetails.maturityDate && (
+                                                <Grid item xs={12} sm={6} md={4}>
+                                                    <Typography variant="caption" color="text.secondary">Maturity Date</Typography>
+                                                    <Typography variant="body2">{new Date(displayLoanDetails.maturityDate!).toLocaleDateString()}</Typography>
+                                                </Grid>
+                                            )}
                                         </Grid>
                                     </CardContent>
                                 </Card>
@@ -460,22 +598,46 @@ export default function LoanApplicationDetails() {
                     </TabPanel>
 
                     <TabPanel value={activeTab} index={1}>
-                        <RepaymentHistory
-                            schedule={mockLoanData.repaymentSchedule}
-                            summary={mockLoanData.repaymentSummary}
-                        />
+                        {isLoadingRepayment ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                                <CircularProgress />
+                            </Box>
+                        ) : (
+                            <RepaymentHistory
+                                schedule={displayRepaymentHistory.schedule}
+                                summary={displayRepaymentHistory.summary}
+                            />
+                        )}
                     </TabPanel>
 
                     <TabPanel value={activeTab} index={2}>
-                        <CreditHistory creditProfile={mockLoanData.creditProfile} />
+                        {isLoadingCredit ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                                <CircularProgress />
+                            </Box>
+                        ) : (
+                            <CreditHistory creditProfile={displayCreditHistory} />
+                        )}
                     </TabPanel>
 
                     <TabPanel value={activeTab} index={3}>
-                        <TransactionList transactions={mockLoanData.transactions} />
+                        {isLoadingLoanDetails ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                                <CircularProgress />
+                            </Box>
+                        ) : (
+                            <TransactionList transactions={displayTransactions} />
+                        )}
                     </TabPanel>
 
                     <TabPanel value={activeTab} index={4}>
-                        <AuditTrail auditLog={mockLoanData.auditLog} />
+                        {isLoadingAudit ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                                <CircularProgress />
+                            </Box>
+                        ) : (
+                            <AuditTrail auditLog={displayAuditLog} />
+                        )}
                     </TabPanel>
                 </Box>
             </Paper>

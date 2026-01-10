@@ -16,13 +16,31 @@ import {
   TablePagination,
   Chip,
   InputAdornment,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
-import { Search, PersonAdd } from '@mui/icons-material';
+import {
+  Search,
+  PersonAdd,
+  Visibility,
+  CheckCircle,
+  Cancel,
+  HourglassEmpty,
+  RateReview,
+} from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
-import { useApplicants } from '@/hooks/usePrediction';
+import { useApplicants } from '@/hooks/useApplicants';
 import { TableSkeleton } from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/common/EmptyState';
-import { formatDate, formatCurrency } from '@/lib/utils';
+
+// Mock data for demonstration - will be replaced by API data
+const mockApplicants = [
+  { id: '1', firstName: 'John', lastName: 'Doe', email: 'john@example.com', phone: '+94771234567', creditScore: 720, loanAmount: 500000, loanPurpose: 'Home', status: 'approved', eligibilityStatus: 'eligible', createdAt: '2024-01-15' },
+  { id: '2', firstName: 'Jane', lastName: 'Smith', email: 'jane@example.com', phone: '+94772345678', creditScore: 680, loanAmount: 1000000, loanPurpose: 'Vehicle', status: 'pending', eligibilityStatus: null, createdAt: '2024-01-16' },
+  { id: '3', firstName: 'Mike', lastName: 'Johnson', email: 'mike@example.com', phone: '+94773456789', creditScore: 750, loanAmount: 750000, loanPurpose: 'Business', status: 'under_review', eligibilityStatus: 'eligible', createdAt: '2024-01-17' },
+  { id: '4', firstName: 'Sarah', lastName: 'Williams', email: 'sarah@example.com', phone: '+94774567890', creditScore: 620, loanAmount: 250000, loanPurpose: 'Personal', status: 'rejected', eligibilityStatus: 'not_eligible', createdAt: '2024-01-18' },
+  { id: '5', firstName: 'David', lastName: 'Brown', email: 'david@example.com', phone: '+94775678901', creditScore: 700, loanAmount: 1500000, loanPurpose: 'Home', status: 'approved', eligibilityStatus: 'eligible', createdAt: '2024-01-19' },
+];
 
 export default function ApplicantListPage() {
   const router = useRouter();
@@ -41,34 +59,101 @@ export default function ApplicantListPage() {
     setPage(0);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
+  const handleViewApplicant = (applicantId: string) => {
+    router.push(`/applicant/${applicantId}`);
+  };
+
+  const getStatusChip = (status: string) => {
+    switch (status?.toLowerCase()) {
       case 'approved':
-        return 'success';
+        return (
+          <Chip
+            label="Approved"
+            size="small"
+            color="success"
+            icon={<CheckCircle />}
+          />
+        );
       case 'rejected':
-        return 'error';
+        return (
+          <Chip
+            label="Rejected"
+            size="small"
+            color="error"
+            icon={<Cancel />}
+          />
+        );
+      case 'under_review':
+        return (
+          <Chip
+            label="Under Review"
+            size="small"
+            color="info"
+            icon={<RateReview />}
+          />
+        );
       case 'pending':
-        return 'warning';
       default:
-        return 'default';
+        return (
+          <Chip
+            label="Pending"
+            size="small"
+            color="warning"
+            icon={<HourglassEmpty />}
+          />
+        );
     }
   };
 
-  const getCreditScoreColor = (score: number) => {
-    if (score >= 720) return '#2e7d32';
-    if (score >= 650) return '#f59e0b';
-    return '#d32f2f';
+  const getEligibilityChip = (eligibilityStatus: string | null | undefined) => {
+    if (!eligibilityStatus) return <Chip label="Not Checked" size="small" variant="outlined" />;
+    
+    switch (eligibilityStatus.toLowerCase()) {
+      case 'eligible':
+        return <Chip label="Eligible" size="small" color="success" variant="outlined" />;
+      case 'not_eligible':
+        return <Chip label="Not Eligible" size="small" color="error" variant="outlined" />;
+      default:
+        return <Chip label="Pending" size="small" variant="outlined" />;
+    }
   };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+      minimumFractionDigits: 0,
+    }).format(value);
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const getCreditScoreColor = (score: number) => {
+    if (score >= 720) return 'success.main';
+    if (score >= 650) return 'warning.main';
+    return 'error.main';
+  };
+
+  // Use API data if available, otherwise use mock
+  const displayData = data?.items?.length ? data.items : mockApplicants;
+  const totalCount = data?.total || mockApplicants.length;
 
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
           <Typography variant="h4" gutterBottom fontWeight={700}>
-            Applicants
+            All Applicants
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Manage and review loan applications
+            View and manage all loan applications
           </Typography>
         </Box>
         <Button
@@ -83,9 +168,12 @@ export default function ApplicantListPage() {
       <Paper sx={{ p: 2, mb: 3 }}>
         <TextField
           fullWidth
-          placeholder="Search by name or email..."
+          placeholder="Search by name, email, or NIC..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(0);
+          }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -101,28 +189,30 @@ export default function ApplicantListPage() {
           <Box sx={{ p: 2 }}>
             <TableSkeleton rows={rowsPerPage} />
           </Box>
-        ) : data && data.items.length > 0 ? (
+        ) : displayData.length > 0 ? (
           <>
             <TableContainer>
               <Table>
                 <TableHead>
-                  <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Email</TableCell>
-                    <TableCell>Credit Score</TableCell>
-                    <TableCell>Loan Amount</TableCell>
-                    <TableCell>Purpose</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Created</TableCell>
+                  <TableRow sx={{ bgcolor: 'action.hover' }}>
+                    <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Email</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700 }}>Credit Score</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>Loan Amount</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Purpose</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700 }}>Eligibility</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Created</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700 }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {data.items.map((applicant) => (
+                  {displayData.map((applicant) => (
                     <TableRow
                       key={applicant.id}
                       hover
                       sx={{ cursor: 'pointer' }}
-                      onClick={() => router.push(`/applicant/${applicant.id}`)}
+                      onClick={() => handleViewApplicant(applicant.id)}
                     >
                       <TableCell>
                         <Typography variant="body2" fontWeight={600}>
@@ -132,7 +222,7 @@ export default function ApplicantListPage() {
                       <TableCell>
                         <Typography variant="body2">{applicant.email}</Typography>
                       </TableCell>
-                      <TableCell>
+                      <TableCell align="center">
                         <Typography
                           variant="body2"
                           fontWeight={600}
@@ -141,7 +231,7 @@ export default function ApplicantListPage() {
                           {applicant.creditScore}
                         </Typography>
                       </TableCell>
-                      <TableCell>
+                      <TableCell align="right">
                         <Typography variant="body2">
                           {formatCurrency(applicant.loanAmount)}
                         </Typography>
@@ -149,17 +239,30 @@ export default function ApplicantListPage() {
                       <TableCell>
                         <Chip label={applicant.loanPurpose} size="small" variant="outlined" />
                       </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={applicant.status.toUpperCase()}
-                          size="small"
-                          color={getStatusColor(applicant.status) as any}
-                        />
+                      <TableCell align="center">
+                        {getEligibilityChip(applicant.eligibilityStatus)}
+                      </TableCell>
+                      <TableCell align="center">
+                        {getStatusChip(applicant.status)}
                       </TableCell>
                       <TableCell>
                         <Typography variant="caption" color="text.secondary">
                           {formatDate(applicant.createdAt)}
                         </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Tooltip title="View Details">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewApplicant(applicant.id);
+                            }}
+                          >
+                            <Visibility />
+                          </IconButton>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -169,7 +272,7 @@ export default function ApplicantListPage() {
             <TablePagination
               rowsPerPageOptions={[5, 10, 25]}
               component="div"
-              count={data.total}
+              count={totalCount}
               rowsPerPage={rowsPerPage}
               page={page}
               onPageChange={handleChangePage}

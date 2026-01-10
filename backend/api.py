@@ -41,6 +41,7 @@ from database.client import db
 # Import routers
 from routers import auth as auth_module
 from routers import loan_details as loan_details_module
+from routers import applicants as applicants_module
 
 # Setup logging
 setup_logging(
@@ -114,6 +115,9 @@ app.include_router(auth_module.router)
 
 # Mount loan details router
 app.include_router(loan_details_module.router)
+
+# Mount applicants router (CRUD)
+app.include_router(applicants_module.router)
 
 # ============================================
 # PYDANTIC MODELS

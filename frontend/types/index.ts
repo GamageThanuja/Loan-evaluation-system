@@ -29,6 +29,7 @@ export interface Applicant {
   gender: 'M' | 'F' | 'Other';
   maritalStatus: 'Single' | 'Married' | 'Divorced' | 'Widowed';
   dependents: number;
+  nic?: string;
   
   // Financial
   annualIncome: number;
@@ -52,6 +53,48 @@ export interface Applicant {
   updatedAt: string;
   status: 'pending' | 'approved' | 'rejected' | 'under_review';
   assignedTo?: string;
+  
+  // Eligibility
+  eligibilityStatus?: 'eligible' | 'not_eligible' | 'not_checked';
+  eligibilityReasons?: string[];
+  riskScore?: number;
+  
+  // Review
+  reviewNotes?: string;
+  rejectionReason?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+}
+
+// Eligibility Check Response
+export interface EligibilityCheckResult {
+  applicantId: string;
+  isEligible: boolean;
+  riskScore: number;
+  reasons: string[];
+  checkedAt: string;
+  checkedBy: string;
+}
+
+// Review Request
+export interface ReviewSubmission {
+  notes: string;
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+}
+
+// Approval/Rejection
+export interface ApprovalData {
+  notes?: string;
+  interestRate?: number;
+  approvedAmount?: number;
+  conditions?: string[];
+}
+
+export interface RejectionData {
+  reason: string;
+  additionalNotes?: string;
 }
 
 // Prediction & Risk Assessment
