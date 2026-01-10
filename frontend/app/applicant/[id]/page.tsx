@@ -34,10 +34,6 @@ import { useRouter, useParams } from 'next/navigation';
 import { useApplicant, usePrediction, useApproveLoan, useRejectLoan } from '@/hooks/usePrediction';
 import { useAuth } from '@/hooks/useAuth';
 import { DetailSkeleton } from '@/components/ui/LoadingSkeleton';
-import RiskGauge from '@/components/prediction/RiskGauge';
-import ShapExplanation from '@/components/prediction/ShapExplanation';
-import BayesianNetworkDisplay from '@/components/prediction/BayesianNetworkDisplay';
-import BusinessRules from '@/components/prediction/BusinessRules';
 import RiskAssessment from '@/components/loan/RiskAssessment';
 import BayesianReasoning from '@/components/loan/BayesianReasoning';
 import MitigationSuggestions from '@/components/loan/MitigationSuggestions';
@@ -325,7 +321,6 @@ export default function ApplicantDetailPage() {
               {activeTab === 1 && (
                 <BayesianReasoning
                   bayesianNetwork={prediction.bayesianNetwork}
-                  shapExplanation={prediction.shapExplanation}
                   decision={prediction.decision}
                   riskScore={prediction.riskScore}
                 />

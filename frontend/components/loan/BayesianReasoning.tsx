@@ -21,8 +21,7 @@ import {
     Lightbulb,
 } from '@mui/icons-material';
 import BayesianNetworkDisplay from '@/components/prediction/BayesianNetworkDisplay';
-import ShapExplanation from '@/components/prediction/ShapExplanation';
-import { BayesianNetwork, ShapExplanation as ShapExplanationType } from '@/types';
+import { BayesianNetwork } from '@/types';
 
 interface CausalPath {
     path: string[];
@@ -33,14 +32,12 @@ interface CausalPath {
 
 interface BayesianReasoningProps {
     bayesianNetwork: BayesianNetwork;
-    shapExplanation: ShapExplanationType;
     decision: 'APPROVE' | 'REJECT' | 'MANUAL_REVIEW';
     riskScore: number;
 }
 
 export default function BayesianReasoning({
     bayesianNetwork,
-    shapExplanation,
     decision,
     riskScore,
 }: BayesianReasoningProps) {
@@ -76,31 +73,34 @@ export default function BayesianReasoning({
     const generateDecisionLogic = (): string[] => {
         const logic: string[] = [];
 
-        // Add logic based on SHAP values
-        if (shapExplanation.topFeatures && shapExplanation.topFeatures.length > 0) {
-            shapExplanation.topFeatures.slice(0, 5).forEach((feature) => {
-                if (feature.impact > 0) {
-                    logic.push(
-                        `✓ ${feature.name} (${feature.value}) positively contributes to approval with impact of ${Math.abs(feature.impact).toFixed(3)}`
-                    );
-                } else {
-                    logic.push(
-                        `✗ ${feature.name} (${feature.value}) negatively impacts approval with impact of ${Math.abs(feature.impact).toFixed(3)}`
-                    );
-                }
-            });
-        }
-
-        // Add decision summary
+        // Add decision summary based on risk score
         if (decision === 'APPROVE') {
+            logic.push(
+                `✓ Low risk score indicates strong creditworthiness`
+            );
+            logic.push(
+                `✓ All key financial indicators meet approval criteria`
+            );
             logic.push(
                 `\n📊 Overall Assessment: The positive factors outweigh the negative ones, resulting in a ${((1 - riskScore) * 100).toFixed(1)}% approval confidence.`
             );
         } else if (decision === 'REJECT') {
             logic.push(
+                `✗ High risk score indicates elevated default probability`
+            );
+            logic.push(
+                `✗ Key financial indicators do not meet minimum thresholds`
+            );
+            logic.push(
                 `\n📊 Overall Assessment: The negative factors outweigh the positive ones, resulting in a ${(riskScore * 100).toFixed(1)}% risk score.`
             );
         } else {
+            logic.push(
+                `⚠ Mixed risk indicators require human judgment`
+            );
+            logic.push(
+                `⚠ Some factors meet criteria while others need review`
+            );
             logic.push(
                 `\n📊 Overall Assessment: The factors are balanced, requiring manual review for final decision.`
             );

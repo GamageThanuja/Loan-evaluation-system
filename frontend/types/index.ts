@@ -186,6 +186,9 @@ export interface BusinessRule {
   severity: 'info' | 'warning' | 'critical';
   recommendation: string;
   actionRequired: boolean;
+  passed: boolean; // For MitigationSuggestions component
+  description: string; // For MitigationSuggestions component
+  suggestion?: string; // Optional suggestion for failed rules
 }
 
 // Dashboard & Reports

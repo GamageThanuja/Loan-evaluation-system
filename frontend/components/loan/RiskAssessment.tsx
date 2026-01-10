@@ -129,7 +129,7 @@ export default function RiskAssessment({
                                 <Chip
                                     label={`${riskLevel} RISK`}
                                     color={getRiskColor()}
-                                    size="large"
+                                    size="medium"
                                     sx={{ fontWeight: 600, fontSize: '1rem', px: 2 }}
                                 />
                             </Box>
@@ -153,7 +153,7 @@ export default function RiskAssessment({
                                         <Chip
                                             label={decision.replace('_', ' ')}
                                             color={getDecisionColor()}
-                                            size="large"
+                                            size="medium"
                                             sx={{ fontWeight: 600, fontSize: '1rem', px: 2 }}
                                         />
                                     </Box>

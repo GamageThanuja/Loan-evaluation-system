@@ -129,14 +129,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <ListItemIcon sx={{ color: isLoansPath ? 'primary.main' : 'text.secondary' }}>
               <AccountBalance />
             </ListItemIcon>
-            <ListItemText 
-              primary="Loans" 
+            <ListItemText
+              primary="Loans"
               primaryTypographyProps={{ fontWeight: isLoansPath ? 600 : 400 }}
             />
             {loansExpanded ? <ExpandLess /> : <ExpandMore />}
           </ListItemButton>
         </ListItem>
-        
+
         <Collapse in={loansExpanded} timeout="auto" unmountOnExit>
           <List component="div" disablePadding>
             {/* New Applicant */}
@@ -200,7 +200,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </ListItem>
 
         {/* Review - For Bank Managers Only */}
-        {isManager && (
+        {isManager() && (
           <ListItem disablePadding>
             <ListItemButton
               selected={pathname === '/review'}
@@ -221,12 +221,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 <RateReview />
               </ListItemIcon>
               <ListItemText primary="Review" />
-              <Chip 
-                label="Manager" 
-                size="small" 
-                color="secondary" 
-                sx={{ height: 20, fontSize: '0.65rem' }}
-              />
             </ListItemButton>
           </ListItem>
         )}
