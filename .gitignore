@@ -29,15 +29,18 @@ env/
 ENV/
 env.bak/
 venv.bak/
+backend/venv/
+backend/env/
 
-# Jupyter Notebook
-.ipynb_checkpoints
-*.ipynb
-
-# Next.js
-.next/
-out/
+# Node modules
 node_modules/
+frontend/node_modules/
+**/node_modules/
+
+# Package lock files (optional - some teams commit these)
+# Uncomment if you want to exclude them
+# package-lock.json
+# yarn.lock
 
 # IDEs
 .vscode/
@@ -47,27 +50,57 @@ node_modules/
 *~
 .DS_Store
 
-# Model files (large)
+# ML Model Files & Data (LARGE - DO NOT COMMIT)
+# Keep directory structure with .gitkeep files only
+ml-model/data/raw/*.csv
+ml-model/data/raw/*.parquet
+ml-model/data/raw/*.zip
+ml-model/data/processed/*.csv
+ml-model/data/processed/*.parquet
+ml-model/data/processed/*.pkl
+ml-model/data/external/*
+ml-model/models/**/*.pkl
+ml-model/models/**/*.pth
+ml-model/models/**/*.h5
+ml-model/models/**/*.joblib
+ml-model/models/**/*.pt
+ml-model/reports/figures/*.png
+ml-model/reports/figures/*.jpg
+ml-model/reports/figures/*.pdf
+
+# Keep any .gitkeep files to preserve structure
+!**/.gitkeep
+
+# Model files (general patterns)
 *.zip
 *.pkl
 *.pth
 *.h5
 *.joblib
 
-# Data files (keep structure, not data)
-data/raw/*.csv
-data/processed/*.parquet
-data/processed/*.csv
-data/external/*
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
 
-# Logs
+# Next.js Build
+.next/
+out/
+.vercel/
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# Build outputs
+dist/
+build/
+
+# Logs & Process IDs
 *.log
 logs/
-
-# Reports (keep structure, not generated files)
-reports/figures/*.png
-reports/figures/*.jpg
-reports/figures/*.pdf
+*.pid
+backend.pid
+frontend.pid
+logs/*.pid
 
 # Environment variables
 .env
