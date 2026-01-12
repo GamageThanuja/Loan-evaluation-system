@@ -2,7 +2,40 @@
 
 All notable changes to the Loan Evaluation System will be documented in this file.
 
+## [2026-01-12] - Applicant ID Migration & API Integration
+
+### Changed
+- **BREAKING: Migrated applicant IDs from UUID to auto-incrementing integers**
+  - Database: Changed `applicants.id` from UUID to SERIAL (1, 2, 3...)
+  - Backend: Updated all endpoints to accept integer IDs
+  - Frontend: Updated TypeScript interfaces to use `number` type for IDs
+  - Migration script: `005_change_id_to_integer.sql`
+
+- **Removed mock data from frontend services**
+  - Replaced all hardcoded mock data with real API calls
+  - `prediction.ts` reduced from 823 to 273 lines (67% smaller)
+  - All services now connect to actual backend endpoints
+
+- **Fixed API parameter mismatch**
+  - Changed from `skip/limit` to `page/page_size` pagination
+  - Improved response handling for nested data structures
+
+### Added
+- Database schema documentation in `database/schemas/`
+  - Reference files for all tables (users, applicants, predictions, etc.)
+  - Clear separation between schemas (current state) and migrations (history)
+- Migration helper script: `scripts/migrate_to_integer_ids.sh`
+- Comprehensive migration documentation
+
+### Fixed
+- TypeScript type errors in applicant list and detail pages
+- API integration issues in applicants service
+- Response data handling for paginated endpoints
+
+---
+
 ## [2026-01-07] - Frontend Registration & Branding Update
+
 
 ### Added
 - **Registration/Signup Page** (`frontend/app/register/page.tsx`)

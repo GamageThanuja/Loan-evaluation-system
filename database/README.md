@@ -1,98 +1,185 @@
-# Supabase Database Configuration
+# Supabase# Database Structure
 
-## Overview
-This directory contains Supabase database configuration, migrations, and schemas for the Home Credit Loan Approval System.
+This directory contains the database configuration, migrations, and client code for the Loan Evaluation System.
 
-## Structure
+## Directory Structure
+
 ```
 database/
-├── README.md               # This file
-├── .env.example           # Example environment variables
+├── README.md              # This file
+├── schemas/               # Current table definitions (reference documentation)
+│   ├── users.sql
+│   ├── applicants.sql
+│   ├── predictions.sql
+│   ├── credit_history.sql
+│   ├── repayment_history.sql
+│   ├── audit_logs.sql
+│   ├── views.sql
+│   └── functions.sql
 ├── supabase/
-│   ├── config.toml        # Supabase configuration
-│   ├── migrations/        # Database migrations
+│   ├── migrations/        # Database migrations (historical changes)
+│   │   ├── 001_create_users_table.sql
 │   │   ├── 001_initial_schema.sql
-│   │   ├── 002_auth_tables.sql
-│   │   └── 003_prediction_tables.sql
-│   └── seed.sql           # Seed data
-├── schemas/
-│   ├── users.sql          # Users table schema
-│   ├── applicants.sql     # Applicants table schema
-│   ├── predictions.sql    # Predictions table schema
-│   └── audit_logs.sql     # Audit logs schema
+│   │   ├── 002_rls_policies.sql
+│   │   ├── 003_add_password_reset.sql
+│   │   ├── 004_credit_repayment_history.sql
+│   │   └── 005_change_id_to_integer.sql
+│   └── config/            # Supabase configuration files
 └── client/
-    ├── __init__.py        # Supabase client initialization
-    └── queries.py         # Common database queries
+    └── __init__.py        # Supabase client initialization
 ```
 
-## Setup
+### Schemas vs Migrations
 
-### 1. Install Supabase CLI
+- **`schemas/`** - Current state of database tables (reference documentation)
+  - Clean, documented table definitions
+  - Shows what tables look like NOW
+  - Useful for understanding and onboarding
+  - NOT executed - just for reference
+
+- **`supabase/migrations/`** - Historical changes to database
+  - Shows how database evolved over time
+  - Must be run in order
+  - Actually executed to create/modify tables
+  - Includes all ALTER, DROP, CREATE statements
+
+
+## Database Schema
+
+The system uses **Supabase (PostgreSQL)** with the following main tables:
+
+### Core Tables
+- **users** - User authentication and roles (loan_officer, manager)
+- **applicants** - Loan applicant information with auto-incrementing integer IDs
+- **predictions** - ML model predictions with SHAP explanations and Bayesian networks
+- **audit_logs** - Audit trail for all system actions
+
+### History Tables
+- **credit_history** - Credit account history for applicants
+- **repayment_history** - Loan repayment history and schedules
+
+### Views
+- **recent_predictions** - Latest predictions with applicant details
+- **dashboard_stats** - Aggregated statistics for dashboard
+
+## Migrations
+
+All database migrations are in `supabase/migrations/` and should be run in order:
+
+1. **001_create_users_table.sql** - Creates users table with authentication
+2. **001_initial_schema.sql** - Creates core tables (applicants, predictions, audit_logs)
+3. **002_rls_policies.sql** - Row Level Security policies
+4. **003_add_password_reset.sql** - Password reset functionality
+5. **004_credit_repayment_history.sql** - Credit and repayment history tables
+6. **005_change_id_to_integer.sql** - Migrates applicant IDs from UUID to auto-incrementing integers
+
+### Running Migrations
+
+**Option 1: Supabase Dashboard (Recommended)**
+1. Go to https://app.supabase.com
+2. Select your project
+3. Navigate to SQL Editor
+4. Copy and paste the migration file contents
+5. Click Run
+
+**Option 2: Using psql (if direct access is enabled)**
 ```bash
-brew install supabase/tap/supabase
+psql -h db.YOUR_PROJECT.supabase.co \
+     -p 5432 \
+     -U postgres \
+     -d postgres \
+     -f database/supabase/migrations/001_initial_schema.sql
 ```
 
-### 2. Initialize Supabase
-```bash
-cd database
-supabase init
-```
+## Database Client
 
-### 3. Start Local Development
-```bash
-supabase start
-```
+The Python database client is located in `client/__init__.py` and provides:
 
-### 4. Apply Migrations
-```bash
-supabase db reset
+- Connection management (Supabase singleton client)
+- CRUD operations for all tables
+- Query helpers with proper error handling
+- Type conversions between Python and PostgreSQL
+
+### Usage
+
+```python
+from database.client import db
+
+# Get applicants
+applicants = db.get_applicants(user_id="...", page=1, page_size=10)
+
+# Get single applicant
+applicant = db.get_applicant_by_id(applicant_id=1)
+
+# Create prediction
+prediction = db.create_prediction(prediction_data)
 ```
 
 ## Environment Variables
 
-Create a `.env` file in the `backend/` directory with:
+Required environment variables (set in `.env`):
 
 ```env
-# Supabase Configuration
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_KEY=your_supabase_service_role_key
-DATABASE_URL=postgresql://postgres:[password]@db.[project_ref].supabase.co:5432/postgres
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your-service-key
+SUPABASE_ANON_KEY=your-anon-key
 ```
 
-## Database Schema
+## Data Types
 
-### Users Table
-```sql
-- id: UUID (primary key)
-- email: VARCHAR (unique)
-- name: VARCHAR
-- role: ENUM ('loan_officer', 'bank_manager')
-- created_at: TIMESTAMP
-- updated_at: TIMESTAMP
+### Applicant ID Format
+- **Before migration 005**: UUID (e.g., `c5ee79d4-aa0e-42c2-a7b9-b1dcf211c936`)
+- **After migration 005**: Auto-incrementing integer (e.g., `1`, `2`, `3`)
+
+### Status Enums
+- **applicant_status**: `pending`, `approved`, `rejected`, `under_review`
+- **prediction_decision**: `APPROVE`, `REJECT`, `MANUAL_REVIEW`
+- **user_role**: `loan_officer`, `bank_manager`, `admin`
+
+## Seeding Data
+
+To populate the database with sample applicants:
+
+```bash
+cd backend
+python scripts/seed_applicants.py
 ```
 
-### Applicants Table
-```sql
-- id: UUID (primary key)
-- name: VARCHAR
-- email: VARCHAR (unique)
-- phone: VARCHAR
-- income: DECIMAL
-- credit_score: INTEGER
-- loan_amount: DECIMAL
-- loan_purpose: VARCHAR
-- status: ENUM ('pending', 'approved', 'rejected')
-- created_by: UUID (foreign key -> users)
-- created_at: TIMESTAMP
-- updated_at: TIMESTAMP
-```
+This will create sample applicants with predictions, credit history, and repayment data.
+
+## Backup and Recovery
+
+### Backup
+Supabase provides automatic backups. You can also export data:
+1. Go to Database → Backups in Supabase dashboard
+2. Download backup or create manual backup
+
+### Recovery
+1. Restore from Supabase backup
+2. Or re-run migrations and seed script
+
+## Troubleshooting
+
+### Connection Issues
+- Verify `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` in `.env`
+- Check if IP is allowed in Supabase Network Restrictions
+- Ensure Supabase project is active
+
+### Migration Errors
+- Run migrations in order (001, 002, 003, etc.)
+- Check for existing tables before running migrations
+- Review error messages in Supabase SQL Editor
+
+### Data Not Showing
+- Verify migrations have been run
+- Check if seed script completed successfully
+- Verify authentication tokens are valid
+
 
 ### Predictions Table
 ```sql
 - id: UUID (primary key)
 - applicant_id: UUID (foreign key -> applicants)
-- risk_score: DECIMAL
 - confidence: DECIMAL
 - decision: ENUM ('APPROVE', 'REJECT', 'MANUAL_REVIEW')
 - shap_explanation: JSONB
