@@ -24,7 +24,7 @@ export const QUERY_KEYS = {
 };
 
 // Hooks for predictions
-export function usePrediction(id: string): UseQueryResult<PredictionResult, Error> {
+export function usePrediction(id: string | number): UseQueryResult<PredictionResult, Error> {
   return useQuery({
     queryKey: [QUERY_KEYS.predictions, id],
     queryFn: async () => {
@@ -96,7 +96,7 @@ export function useApplicants(
   });
 }
 
-export function useApplicant(id: string): UseQueryResult<Applicant, Error> {
+export function useApplicant(id: string | number): UseQueryResult<Applicant, Error> {
   return useQuery({
     queryKey: [QUERY_KEYS.applicant, id],
     queryFn: async () => {
@@ -137,7 +137,7 @@ export function useCreateApplicant(): UseMutationResult<
 export function useApproveLoan(): UseMutationResult<
   void,
   Error,
-  { applicantId: string; notes?: string },
+  { applicantId: string | number; notes?: string },
   unknown
 > {
   const queryClient = useQueryClient();
@@ -160,7 +160,7 @@ export function useApproveLoan(): UseMutationResult<
 export function useRejectLoan(): UseMutationResult<
   void,
   Error,
-  { applicantId: string; reason: string },
+  { applicantId: string | number; reason: string },
   unknown
 > {
   const queryClient = useQueryClient();

@@ -19,7 +19,7 @@ export interface LoginCredentials {
 
 // Applicant & Application
 export interface Applicant {
-  id: string;
+  id: number;
   name?: string; // Full name from database
   firstName?: string; // For backward compatibility
   lastName?: string; // For backward compatibility

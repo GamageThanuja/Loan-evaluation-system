@@ -57,27 +57,32 @@ export const applicantService = {
   ): Promise<ApiResponse<PaginatedResponse<Applicant>>> => {
     try {
       const params = new URLSearchParams({
-        skip: ((page - 1) * pageSize).toString(),
-        limit: pageSize.toString(),
+        page: page.toString(),
+        page_size: pageSize.toString(),
       });
       
       if (search) params.append('search', search);
       if (status) params.append('status', status);
       
       const response = await apiClient.get(`/api/applicants?${params.toString()}`);
-      const data = toCamelCase(response.data);
+      
+      // Handle both response formats: { data: { items: [...] } } or { items: [...] }
+      const responseData = response.data?.data || response.data;
+      const items = responseData?.items || responseData || [];
+      const total = responseData?.total || items.length;
       
       return {
         success: true,
         data: {
-          items: data.items || data,
-          total: data.total || data.length,
+          items: toCamelCase(items),
+          total,
           page,
           pageSize,
-          totalPages: Math.ceil((data.total || data.length) / pageSize),
+          totalPages: Math.ceil(total / pageSize),
         },
       };
     } catch (error) {
+      console.error('Error fetching applicants:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch applicants',

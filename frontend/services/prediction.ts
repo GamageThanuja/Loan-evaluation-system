@@ -19,7 +19,7 @@ import { generateId, calculateAge } from '@/lib/utils';
 // Mock data for development
 const mockApplicants: Applicant[] = [
   {
-    id: '1',
+    id: 1,
     firstName: 'John',
     lastName: 'Doe',
     email: 'john.doe@email.com',
@@ -45,7 +45,7 @@ const mockApplicants: Applicant[] = [
     status: 'approved',
   },
   {
-    id: '2',
+    id: 2,
     firstName: 'Jane',
     lastName: 'Smith',
     email: 'jane.smith@email.com',
@@ -207,7 +207,7 @@ export const predictionService = {
   },
 
   // Get prediction by ID
-  getPrediction: async (_id: string): Promise<ApiResponse<PredictionResult>> => {
+  getPrediction: async (_id: string | number): Promise<ApiResponse<PredictionResult>> => {
     try {
       // const response = await apiClient.get(`/api/predictions/${id}`);
       
@@ -312,13 +312,13 @@ export const predictionService = {
   },
 
   // Get applicant by ID
-  getApplicant: async (id: string): Promise<ApiResponse<Applicant>> => {
+  getApplicant: async (id: string | number): Promise<ApiResponse<Applicant>> => {
     try {
       // const response = await apiClient.get(`/api/applicants/${id}`);
       
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      const applicant = mockApplicants.find(a => a.id === id) || mockApplicants[0];
+      const applicant = mockApplicants.find(a => a.id === String(id)) || mockApplicants[0];
       
       return {
         success: true,
@@ -364,7 +364,7 @@ export const predictionService = {
   },
 
   // Approve loan
-  approveLoan: async (_applicantId: string, _notes?: string): Promise<ApiResponse<void>> => {
+  approveLoan: async (_applicantId: string | number, _notes?: string): Promise<ApiResponse<void>> => {
     try {
       // const response = await apiClient.post(`/api/applicants/${applicantId}/approve`, { notes });
       
@@ -383,7 +383,7 @@ export const predictionService = {
   },
 
   // Reject loan
-  rejectLoan: async (_applicantId: string, _reason: string): Promise<ApiResponse<void>> => {
+  rejectLoan: async (_applicantId: string | number, _reason: string): Promise<ApiResponse<void>> => {
     try {
       // const response = await apiClient.post(`/api/applicants/${applicantId}/reject`, { reason });
       
@@ -550,7 +550,7 @@ export const predictionService = {
   },
 
   // Get loan application details
-  getLoanApplicationDetails: async (applicantId: string): Promise<ApiResponse<LoanApplicationDetails>> => {
+  getLoanApplicationDetails: async (applicantId: string | number): Promise<ApiResponse<LoanApplicationDetails>> => {
     try {
       const response = await apiClient.get(`/api/loan-details/${applicantId}`);
       

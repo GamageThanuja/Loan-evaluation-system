@@ -50,7 +50,7 @@ export default function ApplicantListPage() {
     setPage(0);
   };
 
-  const handleViewApplicant = (applicantId: string) => {
+  const handleViewApplicant = (applicantId: string | number) => {
     router.push(`/applicant/${applicantId}`);
   };
 

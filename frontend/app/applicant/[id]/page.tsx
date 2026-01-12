@@ -248,7 +248,7 @@ export default function ApplicantDetailPage() {
                   <Typography variant="caption" color="text.secondary">
                     Annual Income
                   </Typography>
-                  <Typography variant="body2">{formatCurrency(applicant.annualIncome)}</Typography>
+                  <Typography variant="body2">{formatCurrency(applicant.annualIncome ?? 0)}</Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="caption" color="text.secondary">

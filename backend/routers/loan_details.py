@@ -40,7 +40,7 @@ class AuditLogEntry(BaseModel):
 
 @router.get("/{applicant_id}")
 async def get_loan_details(
-    applicant_id: str,
+    applicant_id: int,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
     """
@@ -88,7 +88,7 @@ async def get_loan_details(
 
 @router.get("/{applicant_id}/audit-log")
 async def get_audit_log(
-    applicant_id: str,
+    applicant_id: int,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
     """
@@ -118,7 +118,7 @@ async def get_audit_log(
 
 @router.get("/{applicant_id}/repayment")
 async def get_repayment_info(
-    applicant_id: str,
+    applicant_id: int,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
     """
@@ -152,7 +152,7 @@ async def get_repayment_info(
 
 @router.get("/{applicant_id}/credit-history")
 async def get_credit_history(
-    applicant_id: str,
+    applicant_id: int,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
     """
@@ -182,7 +182,7 @@ async def get_credit_history(
 
 @router.get("/{applicant_id}/transactions")
 async def get_transactions(
-    applicant_id: str,
+    applicant_id: int,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
     """
