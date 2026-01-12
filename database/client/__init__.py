@@ -349,6 +349,84 @@ class SupabaseClient:
         except Exception as e:
             logger.error(f"Error getting model performance: {e}")
             return []
+    
+    # ============================================
+    # CREDIT HISTORY METHODS
+    # ============================================
+    
+    def create_credit_history(self, credit_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Create a new credit history record"""
+        try:
+            response = self.client.table("credit_history").insert(credit_data).execute()
+            logger.info(f"✅ Credit history created for applicant: {credit_data['applicant_id']}")
+            return response.data[0] if response.data else None
+        except Exception as e:
+            logger.error(f"Error creating credit history: {e}")
+            return None
+    
+    def get_credit_history_by_applicant(self, applicant_id: str) -> List[Dict[str, Any]]:
+        """Get all credit history records for an applicant"""
+        try:
+            response = (
+                self.client.table("credit_history")
+                .select("*")
+                .eq("applicant_id", applicant_id)
+                .order("opened_date", desc=True)
+                .execute()
+            )
+            return response.data
+        except Exception as e:
+            logger.error(f"Error getting credit history: {e}")
+            return []
+    
+    def bulk_create_credit_history(self, records: List[Dict[str, Any]]) -> bool:
+        """Bulk insert credit history records"""
+        try:
+            self.client.table("credit_history").insert(records).execute()
+            logger.info(f"✅ Bulk created {len(records)} credit history records")
+            return True
+        except Exception as e:
+            logger.error(f"Error bulk creating credit history: {e}")
+            return False
+    
+    # ============================================
+    # REPAYMENT HISTORY METHODS
+    # ============================================
+    
+    def create_repayment_history(self, repayment_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Create a new repayment history record"""
+        try:
+            response = self.client.table("repayment_history").insert(repayment_data).execute()
+            logger.info(f"✅ Repayment history created for applicant: {repayment_data['applicant_id']}")
+            return response.data[0] if response.data else None
+        except Exception as e:
+            logger.error(f"Error creating repayment history: {e}")
+            return None
+    
+    def get_repayment_history_by_applicant(self, applicant_id: str) -> List[Dict[str, Any]]:
+        """Get all repayment history records for an applicant"""
+        try:
+            response = (
+                self.client.table("repayment_history")
+                .select("*")
+                .eq("applicant_id", applicant_id)
+                .order("start_date", desc=True)
+                .execute()
+            )
+            return response.data
+        except Exception as e:
+            logger.error(f"Error getting repayment history: {e}")
+            return []
+    
+    def bulk_create_repayment_history(self, records: List[Dict[str, Any]]) -> bool:
+        """Bulk insert repayment history records"""
+        try:
+            self.client.table("repayment_history").insert(records).execute()
+            logger.info(f"✅ Bulk created {len(records)} repayment history records")
+            return True
+        except Exception as e:
+            logger.error(f"Error bulk creating repayment history: {e}")
+            return False
 
 
 # Create singleton instance

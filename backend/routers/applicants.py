@@ -152,7 +152,7 @@ class ApplicantResponse(BaseModel):
 async def list_applicants(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=100, description="Items per page"),
-    status: Optional[str] = Query(None, description="Filter by status"),
+    status_filter: Optional[str] = Query(None, alias="status", description="Filter by status"),
     search: Optional[str] = Query(None, description="Search by name, email, or NIC"),
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
@@ -168,8 +168,8 @@ async def list_applicants(
     """
     try:
         result = db.get_applicants(
-            user_id=user["sub"],
-            status=status,
+            user_id=user["user_id"],
+            status=status_filter,
             page=page,
             page_size=page_size
         )
@@ -279,7 +279,7 @@ async def create_applicant(
         # Prepare data for database
         data = applicant_data.dict()
         data["status"] = "pending"
-        data["created_by"] = user["sub"]
+        data["created_by"] = user["user_id"]
         data["created_at"] = datetime.utcnow().isoformat()
         data["updated_at"] = datetime.utcnow().isoformat()
         
@@ -294,7 +294,7 @@ async def create_applicant(
         
         # Log action
         db.log_action(
-            user_id=user["sub"],
+            user_id=user["user_id"],
             action="CREATE_APPLICANT",
             resource_type="applicant",
             resource_id=result["id"],
@@ -366,7 +366,7 @@ async def update_applicant(
         
         # Log action
         db.log_action(
-            user_id=user["sub"],
+            user_id=user["user_id"],
             action="UPDATE_APPLICANT",
             resource_type="applicant",
             resource_id=applicant_id,
@@ -411,7 +411,7 @@ async def delete_applicant(
         # Soft delete - update status
         result = db.update_applicant(applicant_id, {
             "status": "deleted",
-            "deleted_by": user["sub"],
+            "deleted_by": user["user_id"],
             "deleted_at": datetime.utcnow().isoformat()
         })
         
@@ -423,7 +423,7 @@ async def delete_applicant(
         
         # Log action
         db.log_action(
-            user_id=user["sub"],
+            user_id=user["user_id"],
             action="DELETE_APPLICANT",
             resource_type="applicant",
             resource_id=applicant_id
@@ -469,62 +469,54 @@ async def check_eligibility(
             )
         
         # TODO: Integrate with actual ML model
-        # For now, return mock eligibility result
-        import random
-        is_eligible = random.random() > 0.3
-        risk_score = random.uniform(0.1, 0.5) if is_eligible else random.uniform(0.5, 0.9)
-        
-        reasons = []
-        recommendations = []
-        
-        if not is_eligible:
-            possible_reasons = [
-                "Insufficient income to support the requested loan amount",
-                "Credit history indicates multiple late payments",
-                "Employment duration below minimum requirement",
-                "Existing loan obligations exceed threshold",
-                "Debt-to-income ratio too high"
-            ]
-            reasons = random.sample(possible_reasons, random.randint(1, 3))
-            recommendations = [
-                "Consider a lower loan amount",
-                "Provide additional income documentation",
-                "Clear existing obligations before reapplying"
-            ]
-        
-        # Save eligibility result
-        eligibility_data = {
-            "applicant_id": applicant_id,
-            "eligible": is_eligible,
-            "risk_score": risk_score,
-            "confidence": random.uniform(0.85, 0.95),
-            "reasons": reasons,
-            "recommendations": recommendations,
-            "checked_by": user["sub"],
-            "checked_at": datetime.utcnow().isoformat()
-        }
-        
-        # Update applicant with eligibility status
-        db.update_applicant(applicant_id, {
-            "eligibility_status": "eligible" if is_eligible else "not_eligible",
-            "eligibility_reasons": reasons,
-            "risk_score": risk_score,
-            "updated_at": datetime.utcnow().isoformat()
-        })
-        
-        # Log action
-        db.log_action(
-            user_id=user["sub"],
-            action="CHECK_ELIGIBILITY",
-            resource_type="applicant",
-            resource_id=applicant_id,
-            details={"eligible": is_eligible, "risk_score": risk_score}
+        # The ML model should be called here to generate predictions
+        # For now, return an error indicating ML model is not yet integrated
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="ML model integration pending. Eligibility check will be available once the model is integrated."
         )
         
-        return {
-            "success": True,
-            "data": eligibility_data
-        }
+        # When ML model is integrated, the code should look like:
+        # from ml_model.inference import predict
+        # prediction = predict(applicant)
+        # is_eligible = prediction["decision"] == "APPROVE"
+        # risk_score = prediction["risk_score"]
+        # reasons = prediction.get("rejection_reasons", [])
+        # recommendations = prediction.get("recommendations", [])
+        
+        # # Save eligibility result
+        # eligibility_data = {
+        #     "applicant_id": applicant_id,
+        #     "eligible": is_eligible,
+        #     "risk_score": risk_score,
+        #     "confidence": prediction.get("confidence", 0.0),
+        #     "reasons": reasons,
+        #     "recommendations": recommendations,
+        #     "checked_by": user["user_id"],
+        #     "checked_at": datetime.utcnow().isoformat()
+        # }
+        
+        # # Update applicant with eligibility status
+        # db.update_applicant(applicant_id, {
+        #     "eligibility_status": "eligible" if is_eligible else "not_eligible",
+        #     "eligibility_reasons": reasons,
+        #     "risk_score": risk_score,
+        #     "updated_at": datetime.utcnow().isoformat()
+        # })
+        
+        # # Log action
+        # db.log_action(
+        #     user_id=user["user_id"],
+        #     action="CHECK_ELIGIBILITY",
+        #     resource_type="applicant",
+        #     resource_id=applicant_id,
+        #     details={"eligible": is_eligible, "risk_score": risk_score}
+        # )
+        
+        # return {
+        #     "success": True,
+        #     "data": eligibility_data
+        # }
     except HTTPException:
         raise
     except Exception as e:
@@ -564,7 +556,7 @@ async def send_for_review(
         # Update status to under_review
         result = db.update_applicant(applicant_id, {
             "status": "under_review",
-            "sent_for_review_by": user["sub"],
+            "sent_for_review_by": user["user_id"],
             "sent_for_review_at": datetime.utcnow().isoformat(),
             "eligibility_result": request.eligibility_result,
             "review_notes": request.notes,
@@ -579,7 +571,7 @@ async def send_for_review(
         
         # Log action
         db.log_action(
-            user_id=user["sub"],
+            user_id=user["user_id"],
             action="SEND_FOR_REVIEW",
             resource_type="applicant",
             resource_id=applicant_id
@@ -615,7 +607,7 @@ async def get_pending_reviews(
     """
     try:
         result = db.get_applicants(
-            user_id=user["sub"],
+            user_id=user["user_id"],
             status="under_review",
             page=page,
             page_size=page_size
@@ -662,7 +654,7 @@ async def approve_application(
         # Approve
         result = db.approve_applicant(
             applicant_id=applicant_id,
-            approved_by=user["sub"],
+            approved_by=user["user_id"],
             notes=request.notes
         )
         
@@ -674,7 +666,7 @@ async def approve_application(
         
         # Log action
         db.log_action(
-            user_id=user["sub"],
+            user_id=user["user_id"],
             action="APPROVE_APPLICATION",
             resource_type="applicant",
             resource_id=applicant_id,
@@ -731,7 +723,7 @@ async def reject_application(
         # Reject
         result = db.reject_applicant(
             applicant_id=applicant_id,
-            rejected_by=user["sub"],
+            rejected_by=user["user_id"],
             reason=request.reason
         )
         
@@ -743,7 +735,7 @@ async def reject_application(
         
         # Log action
         db.log_action(
-            user_id=user["sub"],
+            user_id=user["user_id"],
             action="REJECT_APPLICATION",
             resource_type="applicant",
             resource_id=applicant_id,
@@ -787,26 +779,95 @@ async def get_credit_history(
                 detail="Applicant not found"
             )
         
-        # TODO: Fetch from credit history service/table
-        # For now, return mock data
+        # Fetch credit history from database
+        credit_accounts = db.get_credit_history_by_applicant(applicant_id)
+        
+        if not credit_accounts:
+            # Return empty credit history if no records found
+            return {
+                "success": True,
+                "data": {
+                    "credit_score": applicant.get("credit_score", 0),
+                    "score_change": 0,
+                    "last_updated": datetime.utcnow().isoformat(),
+                    "credit_utilization": 0,
+                    "payment_history_score": 0,
+                    "credit_age_years": 0,
+                    "recent_inquiries": 0,
+                    "derogatory_marks": 0,
+                    "accounts": [],
+                    "factors": []
+                }
+            }
+        
+        # Calculate summary statistics from actual credit accounts
+        open_accounts = [acc for acc in credit_accounts if acc.get("account_status") == "open"]
+        
+        # Calculate total credit utilization
+        total_balance = sum(float(acc.get("balance", 0)) for acc in open_accounts if acc.get("account_type") == "credit_card")
+        total_limit = sum(float(acc.get("credit_limit", 0)) for acc in open_accounts if acc.get("credit_limit"))
+        avg_utilization = (total_balance / total_limit * 100) if total_limit > 0 else 0
+        
+        # Calculate average payment history score
+        payment_scores = [acc.get("payment_history_score", 0) for acc in credit_accounts if acc.get("payment_history_score")]
+        avg_payment_score = sum(payment_scores) / len(payment_scores) if payment_scores else 0
+        
+        # Calculate credit age (oldest account)
+        oldest_account = min(credit_accounts, key=lambda x: x.get("opened_date", "9999-12-31"))
+        oldest_date = datetime.strptime(oldest_account.get("opened_date", datetime.now().strftime("%Y-%m-%d")), "%Y-%m-%d")
+        credit_age_years = (datetime.now() - oldest_date).days / 365.25
+        
+        # Count derogatory marks
+        total_derogatory = sum(acc.get("derogatory_marks", 0) for acc in credit_accounts)
+        
+        # Format accounts for response
+        formatted_accounts = []
+        for acc in credit_accounts:
+            formatted_acc = {
+                "type": acc.get("account_type", "").replace("_", " ").title(),
+                "status": acc.get("account_status", "").title(),
+                "balance": float(acc.get("balance", 0)),
+                "limit": float(acc.get("credit_limit", 0)) if acc.get("credit_limit") else None,
+                "opened_date": acc.get("opened_date"),
+                "payment_history_score": acc.get("payment_history_score", 0),
+                "utilization": float(acc.get("credit_utilization", 0)) if acc.get("credit_utilization") else None
+            }
+            formatted_accounts.append(formatted_acc)
+        
+        # Generate factors based on actual data
+        factors = []
+        if avg_payment_score >= 90:
+            factors.append({"factor": "Payment History", "impact": "positive", "description": "Consistent on-time payments"})
+        elif avg_payment_score >= 70:
+            factors.append({"factor": "Payment History", "impact": "neutral", "description": "Mostly on-time payments with occasional delays"})
+        else:
+            factors.append({"factor": "Payment History", "impact": "negative", "description": "History of late or missed payments"})
+        
+        if avg_utilization < 30:
+            factors.append({"factor": "Credit Utilization", "impact": "positive", "description": f"Low utilization at {avg_utilization:.1f}%"})
+        elif avg_utilization < 50:
+            factors.append({"factor": "Credit Utilization", "impact": "neutral", "description": f"Moderate utilization at {avg_utilization:.1f}%"})
+        else:
+            factors.append({"factor": "Credit Utilization", "impact": "negative", "description": f"High utilization at {avg_utilization:.1f}%"})
+        
+        if credit_age_years >= 7:
+            factors.append({"factor": "Credit Age", "impact": "positive", "description": f"Established credit history of {credit_age_years:.1f} years"})
+        elif credit_age_years >= 3:
+            factors.append({"factor": "Credit Age", "impact": "neutral", "description": f"Moderate credit history of {credit_age_years:.1f} years"})
+        else:
+            factors.append({"factor": "Credit Age", "impact": "negative", "description": f"Limited credit history of {credit_age_years:.1f} years"})
+        
         credit_history = {
-            "credit_score": applicant.get("credit_score", 700),
-            "score_change": 15,
+            "credit_score": applicant.get("credit_score", 0),
+            "score_change": 0,  # Would need historical data to calculate
             "last_updated": datetime.utcnow().isoformat(),
-            "credit_utilization": 35,
-            "payment_history_score": 95,
-            "credit_age_years": 8,
-            "recent_inquiries": 2,
-            "derogatory_marks": 0,
-            "accounts": [
-                {"type": "Credit Card", "status": "Open", "balance": 50000, "limit": 200000},
-                {"type": "Personal Loan", "status": "Closed", "balance": 0, "original_amount": 300000},
-            ],
-            "factors": [
-                {"factor": "Payment History", "impact": "positive", "description": "Consistent on-time payments"},
-                {"factor": "Credit Utilization", "impact": "positive", "description": "Below 40% utilization"},
-                {"factor": "Recent Inquiries", "impact": "neutral", "description": "2 inquiries in last 6 months"},
-            ]
+            "credit_utilization": round(avg_utilization, 2),
+            "payment_history_score": round(avg_payment_score, 0),
+            "credit_age_years": round(credit_age_years, 1),
+            "recent_inquiries": 0,  # Would need inquiry tracking
+            "derogatory_marks": total_derogatory,
+            "accounts": formatted_accounts,
+            "factors": factors
         }
         
         return {
@@ -841,47 +902,90 @@ async def get_repayment_history(
                 detail="Applicant not found"
             )
         
-        # TODO: Fetch from repayment history service/table
-        # For now, return mock data
+        # Fetch repayment history from database
+        loan_records = db.get_repayment_history_by_applicant(applicant_id)
+        
+        if not loan_records:
+            # Return empty repayment history if no records found
+            return {
+                "success": True,
+                "data": {
+                    "summary": {
+                        "total_loans": 0,
+                        "active_loans": 0,
+                        "closed_loans": 0,
+                        "total_repaid": 0,
+                        "on_time_payments_pct": 0,
+                        "average_days_late": 0
+                    },
+                    "loans": [],
+                    "recent_payments": []
+                }
+            }
+        
+        # Calculate summary statistics
+        total_loans = len(loan_records)
+        active_loans = sum(1 for loan in loan_records if loan.get("loan_status") == "active")
+        closed_loans = sum(1 for loan in loan_records if loan.get("loan_status") in ["closed", "paid_off"])
+        
+        # Calculate total repaid (original amount - remaining balance for all loans)
+        total_repaid = sum(
+            float(loan.get("original_amount", 0)) - float(loan.get("remaining_balance", 0))
+            for loan in loan_records
+        )
+        
+        # Calculate average on-time payment percentage
+        on_time_percentages = [loan.get("on_time_payment_percentage", 0) for loan in loan_records]
+        avg_on_time_pct = sum(on_time_percentages) / len(on_time_percentages) if on_time_percentages else 0
+        
+        # Calculate average days late
+        avg_days_late_values = [loan.get("average_days_late", 0) for loan in loan_records]
+        avg_days_late = sum(avg_days_late_values) / len(avg_days_late_values) if avg_days_late_values else 0
+        
+        # Format loans for response
+        formatted_loans = []
+        all_recent_payments = []
+        
+        for loan in loan_records:
+            formatted_loan = {
+                "id": loan.get("loan_id"),
+                "type": loan.get("loan_type", "").replace("_", " ").title(),
+                "original_amount": float(loan.get("original_amount", 0)),
+                "remaining_balance": float(loan.get("remaining_balance", 0)),
+                "status": loan.get("loan_status", "").replace("_", " "),
+                "start_date": loan.get("start_date"),
+                "end_date": loan.get("end_date"),
+                "monthly_payment": float(loan.get("monthly_payment", 0)) if loan.get("monthly_payment") else None,
+                "next_due_date": loan.get("next_due_date"),
+                "on_time_payments": loan.get("on_time_payments", 0),
+                "late_payments": loan.get("late_payments", 0)
+            }
+            formatted_loans.append(formatted_loan)
+            
+            # Collect recent payments from all loans
+            recent_payments = loan.get("recent_payments", [])
+            if isinstance(recent_payments, list):
+                for payment in recent_payments:
+                    payment["loan_id"] = loan.get("loan_id")
+                    all_recent_payments.append(payment)
+        
+        # Sort recent payments by date (most recent first)
+        all_recent_payments.sort(key=lambda x: x.get("date", ""), reverse=True)
+        
+        # Take only the most recent 10 payments
+        recent_payments_limited = all_recent_payments[:10]
+        
         repayment_history = {
             "summary": {
-                "total_loans": 3,
-                "active_loans": 1,
-                "closed_loans": 2,
-                "total_repaid": 850000,
-                "on_time_payments_pct": 95,
-                "average_days_late": 1.2
+                "total_loans": total_loans,
+                "active_loans": active_loans,
+                "closed_loans": closed_loans,
+                "total_repaid": round(total_repaid, 2),
+                "on_time_payments_pct": round(avg_on_time_pct, 0),
+                "average_days_late": round(avg_days_late, 1)
             },
-            "loans": [
-                {
-                    "id": "LOAN001",
-                    "type": "Personal Loan",
-                    "original_amount": 500000,
-                    "remaining_balance": 0,
-                    "status": "closed",
-                    "start_date": "2022-01-15",
-                    "end_date": "2024-01-15",
-                    "on_time_payments": 24,
-                    "late_payments": 0
-                },
-                {
-                    "id": "LOAN002",
-                    "type": "Vehicle Loan",
-                    "original_amount": 1500000,
-                    "remaining_balance": 750000,
-                    "status": "active",
-                    "start_date": "2023-06-10",
-                    "monthly_payment": 45000,
-                    "next_due_date": "2026-02-10",
-                    "on_time_payments": 18,
-                    "late_payments": 1
-                }
-            ],
-            "recent_payments": [
-                {"date": "2025-01-10", "amount": 45000, "loan_id": "LOAN002", "status": "paid", "days_late": 0},
-                {"date": "2024-12-10", "amount": 45000, "loan_id": "LOAN002", "status": "paid", "days_late": 0},
-                {"date": "2024-11-10", "amount": 45000, "loan_id": "LOAN002", "status": "paid", "days_late": 0},
-            ]
+            "loans": formatted_loans,
+            "recent_payments": recent_payments_limited
         }
         
         return {

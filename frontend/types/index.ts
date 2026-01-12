@@ -20,33 +20,47 @@ export interface LoginCredentials {
 // Applicant & Application
 export interface Applicant {
   id: string;
-  firstName: string;
-  lastName: string;
+  name?: string; // Full name from database
+  firstName?: string; // For backward compatibility
+  lastName?: string; // For backward compatibility
   email: string;
   phone: string;
   dateOfBirth: string;
-  age: number;
-  gender: 'M' | 'F' | 'Other';
-  maritalStatus: 'Single' | 'Married' | 'Divorced' | 'Widowed';
-  dependents: number;
+  age?: number;
+  gender?: 'M' | 'F' | 'Other';
+  maritalStatus?: 'Single' | 'Married' | 'Divorced' | 'Widowed';
+  dependents?: number;
   nic?: string;
-  
   // Financial
-  annualIncome: number;
-  employmentType: 'Employed' | 'Self-Employed' | 'Unemployed' | 'Student' | 'Retired';
-  employmentLength: number; // years
-  creditScore: number;
+  monthlyIncome?: number;
+  annualIncome?: number;
+  employmentType?: 'Employed' | 'Self-Employed' | 'Unemployed' | 'Student' | 'Retired';
+  employmentStatus?: string;
+  employmentLength?: number; // years
+  yearsEmployed?: number;
+  occupation?: string;
+  employerName?: string;
+  creditScore?: number;
+  existingLoansCount?: number;
+  existingDebtAmount?: number;
+  assetsValue?: number;
   
   // Loan Details
   loanAmount: number;
-  loanPurpose: 'Home' | 'Auto' | 'Personal' | 'Education' | 'Business' | 'Other';
-  loanTerm: number; // months
+  loanPurpose: string;
+  loanTerm?: number; // months
+  loanTermMonths?: number;
   
   // Address
   address?: string;
+  addressLine1?: string;
+  addressLine2?: string;
   city?: string;
   state?: string;
   zipCode?: string;
+  postalCode?: string;
+  country?: string;
+  educationLevel?: string;
   
   // Metadata
   createdAt: string;

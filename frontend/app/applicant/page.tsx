@@ -33,21 +33,12 @@ import { useApplicants } from '@/hooks/useApplicants';
 import { TableSkeleton } from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/common/EmptyState';
 
-// Mock data for demonstration - will be replaced by API data
-const mockApplicants = [
-  { id: '1', firstName: 'John', lastName: 'Doe', email: 'john@example.com', phone: '+94771234567', creditScore: 720, loanAmount: 500000, loanPurpose: 'Home', status: 'approved', eligibilityStatus: 'eligible', createdAt: '2024-01-15' },
-  { id: '2', firstName: 'Jane', lastName: 'Smith', email: 'jane@example.com', phone: '+94772345678', creditScore: 680, loanAmount: 1000000, loanPurpose: 'Vehicle', status: 'pending', eligibilityStatus: null, createdAt: '2024-01-16' },
-  { id: '3', firstName: 'Mike', lastName: 'Johnson', email: 'mike@example.com', phone: '+94773456789', creditScore: 750, loanAmount: 750000, loanPurpose: 'Business', status: 'under_review', eligibilityStatus: 'eligible', createdAt: '2024-01-17' },
-  { id: '4', firstName: 'Sarah', lastName: 'Williams', email: 'sarah@example.com', phone: '+94774567890', creditScore: 620, loanAmount: 250000, loanPurpose: 'Personal', status: 'rejected', eligibilityStatus: 'not_eligible', createdAt: '2024-01-18' },
-  { id: '5', firstName: 'David', lastName: 'Brown', email: 'david@example.com', phone: '+94775678901', creditScore: 700, loanAmount: 1500000, loanPurpose: 'Home', status: 'approved', eligibilityStatus: 'eligible', createdAt: '2024-01-19' },
-];
-
 export default function ApplicantListPage() {
   const router = useRouter();
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [search, setSearch] = useState('');
-  
+
   const { data, isLoading } = useApplicants(page + 1, rowsPerPage, search);
 
   const handleChangePage = (_: unknown, newPage: number) => {
@@ -107,7 +98,7 @@ export default function ApplicantListPage() {
 
   const getEligibilityChip = (eligibilityStatus: string | null | undefined) => {
     if (!eligibilityStatus) return <Chip label="Not Checked" size="small" variant="outlined" />;
-    
+
     switch (eligibilityStatus.toLowerCase()) {
       case 'eligible':
         return <Chip label="Eligible" size="small" color="success" variant="outlined" />;
@@ -141,9 +132,9 @@ export default function ApplicantListPage() {
     return 'error.main';
   };
 
-  // Use API data if available, otherwise use mock
-  const displayData = data?.items?.length ? data.items : mockApplicants;
-  const totalCount = data?.total || mockApplicants.length;
+  // Use API data
+  const displayData = data?.items || [];
+  const totalCount = data?.total || 0;
 
   return (
     <Box>
@@ -216,7 +207,7 @@ export default function ApplicantListPage() {
                     >
                       <TableCell>
                         <Typography variant="body2" fontWeight={600}>
-                          {applicant.firstName} {applicant.lastName}
+                          {applicant.name}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -226,9 +217,9 @@ export default function ApplicantListPage() {
                         <Typography
                           variant="body2"
                           fontWeight={600}
-                          sx={{ color: getCreditScoreColor(applicant.creditScore) }}
+                          sx={{ color: getCreditScoreColor(applicant.creditScore || 0) }}
                         >
-                          {applicant.creditScore}
+                          {applicant.creditScore || '-'}
                         </Typography>
                       </TableCell>
                       <TableCell align="right">
