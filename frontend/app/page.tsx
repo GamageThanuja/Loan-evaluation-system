@@ -156,37 +156,43 @@ export default function Dashboard() {
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                         <Typography variant="body2">Status</Typography>
                         <Chip
-                          label={health.status.toUpperCase()}
+                          label={health.status?.toUpperCase() || 'UNKNOWN'}
                           color={health.status === 'healthy' ? 'success' : 'warning'}
                           size="small"
                         />
                       </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="body2">Version</Typography>
-                        <Typography variant="body2" fontWeight={600}>
-                          {health.version}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="body2">Avg Response Time</Typography>
-                        <Typography variant="body2" fontWeight={600}>
-                          {health.avgResponseTime}ms
-                        </Typography>
-                      </Box>
+                      {health.version && (
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="body2">Version</Typography>
+                          <Typography variant="body2" fontWeight={600}>
+                            {health.version}
+                          </Typography>
+                        </Box>
+                      )}
+                      {health.avgResponseTime !== undefined && (
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="body2">Avg Response Time</Typography>
+                          <Typography variant="body2" fontWeight={600}>
+                            {health.avgResponseTime}ms
+                          </Typography>
+                        </Box>
+                      )}
                     </Box>
-                    <Box sx={{ mb: 1 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                        <Typography variant="caption">Success Rate</Typography>
-                        <Typography variant="caption" fontWeight={600}>
-                          {formatPercent(health.successRate)}
-                        </Typography>
+                    {health.successRate !== undefined && (
+                      <Box sx={{ mb: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="caption">Success Rate</Typography>
+                          <Typography variant="caption" fontWeight={600}>
+                            {formatPercent(health.successRate)}
+                          </Typography>
+                        </Box>
+                        <LinearProgress
+                          variant="determinate"
+                          value={health.successRate * 100}
+                          color="success"
+                        />
                       </Box>
-                      <LinearProgress
-                        variant="determinate"
-                        value={health.successRate * 100}
-                        color="success"
-                      />
-                    </Box>
+                    )}
                   </Box>
                 ) : null}
               </CardContent>

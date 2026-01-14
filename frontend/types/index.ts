@@ -217,12 +217,19 @@ export interface DashboardStats {
 }
 
 export interface ModelHealth {
-  status: 'healthy' | 'degraded' | 'offline';
-  lastUpdated: string;
-  version: string;
-  avgResponseTime: number;
-  successRate: number;
-  errorRate: number;
+  status: 'healthy' | 'degraded' | 'offline' | 'unhealthy';
+  lastUpdated?: string;
+  version?: string;
+  avgResponseTime?: number;
+  successRate?: number;
+  errorRate?: number;
+  // Additional fields from backend
+  model_loaded?: boolean;
+  bayesian_reasoner_loaded?: boolean;
+  features_loaded?: boolean;
+  total_features?: number;
+  optimal_threshold?: number;
+  reasoning_capability?: string;
 }
 
 export interface RecentPrediction {
@@ -465,4 +472,154 @@ export interface LoanApplicationDetails extends Applicant {
     createdBy: string;
     createdAt: string;
   }[];
+}
+// ============================================
+// ML PREDICTION & REASONING TYPES
+// ============================================
+
+export interface FeatureInfluence {
+  feature_name: string;
+  feature_value: number;
+  discretized_value: number;
+  influence_direction: 'increases_risk' | 'decreases_risk' | 'neutral';
+  influence_strength: number;
+  conditional_probability: number;
+  explanation: string;
+}
+
+export interface InferencePath {
+  parent_nodes: string[];
+  child_nodes: string[];
+  path_strength: number;
+  description: string;
+}
+
+export interface EligibilityResult {
+  applicant_id?: number;
+  eligible: boolean;
+  risk_score: number;
+  probability: number;
+  decision: 'APPROVE' | 'REJECT';
+  risk_level: string;
+  summary_explanation: string;
+  risk_factors: FeatureInfluence[];
+  protective_factors: FeatureInfluence[];
+  recommendations: string[];
+  confidence_score: number;
+  model_type?: string;
+  // Additional fields for loan details display
+  loan_details?: {
+    requested_amount: number;
+    requested_amount_formatted: string;
+    loan_term_months: number;
+    loan_term_description: string;
+    interest_rate: string;
+    monthly_payment_principal_only: number;
+    monthly_payment_principal_only_formatted: string;
+    monthly_payment_with_interest: number;
+    monthly_payment_with_interest_formatted: string;
+    interest_note: string;
+  };
+  financial_profile?: {
+    monthly_income: number;
+    monthly_income_formatted: string;
+    annual_income: number;
+    annual_income_formatted: string;
+    loan_to_income_ratio: number;
+    loan_to_income_description: string;
+    payment_to_income_ratio: number;
+    payment_to_income_description: string;
+  };
+  raw_decision?: {
+    eligible: boolean;
+    status: string;
+    risk_level: string;
+    risk_score_percentage: number;
+    risk_explanation: string;
+  };
+  raw_model_info?: {
+    model_type: string;
+    confidence_score: number;
+    confidence_description: string;
+    threshold_used: number;
+    note: string;
+  };
+}
+
+export interface PredictionWithReasoning {
+  prediction: number;
+  probability: number;
+  risk_level: string;
+  decision: 'APPROVE' | 'REJECT';
+  top_risk_factors: FeatureInfluence[];
+  top_protective_factors: FeatureInfluence[];
+  inference_paths: InferencePath[];
+  summary_explanation: string;
+  detailed_explanation: string;
+  conditional_probabilities: Record<string, number>;
+  confidence_score: number;
+  evidence_strength: string;
+  model_type: string;
+  tabnet_probability?: number;
+  bayesian_probability?: number;
+}
+
+export interface BayesianNetworkNode {
+  id: string;
+  description: string;
+  is_target: boolean;
+}
+
+export interface BayesianNetworkEdge {
+  from: string;
+  to: string;
+  from_desc: string;
+  to_desc: string;
+}
+
+export interface BayesianNetworkStructure {
+  nodes: BayesianNetworkNode[];
+  edges: BayesianNetworkEdge[];
+  target_parents: string[];
+  total_nodes: number;
+  total_edges: number;
+}
+
+export interface ScenarioComparison {
+  scenario_a: PredictionWithReasoning;
+  scenario_b: PredictionWithReasoning;
+  comparison: {
+    probability_difference: number;
+    changed_features: {
+      feature: string;
+      original_value: number;
+      new_value: number;
+      change: number;
+    }[];
+    summary: string;
+    decision_changed: boolean;
+  };
+}
+
+export interface ModelInfo {
+  tabnet_loaded: boolean;
+  bayesian_reasoner_loaded: boolean;
+  total_features: number;
+  optimal_threshold: number;
+  model_type: string;
+  capabilities: {
+    basic_prediction: boolean;
+    bayesian_reasoning: boolean;
+    feature_explanation: boolean;
+    network_visualization: boolean;
+    scenario_comparison: boolean;
+  };
+}
+
+// Simplified applicant for dropdown selection
+export interface ApplicantOption {
+  id: number;
+  name: string;
+  nic: string;
+  email: string;
 }

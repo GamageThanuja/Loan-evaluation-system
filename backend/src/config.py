@@ -9,24 +9,30 @@ from typing import Dict
 
 # Project root directory
 PROJECT_ROOT = Path(__file__).parent.parent
+# Overall project root (parent of backend)
+OVERALL_PROJECT_ROOT = PROJECT_ROOT.parent
 
 class Config:
     """Application configuration"""
     
-    # Data paths
-    DATA_DIR = PROJECT_ROOT / 'data'
+    # Project roots
+    PROJECT_ROOT = PROJECT_ROOT
+    OVERALL_PROJECT_ROOT = OVERALL_PROJECT_ROOT
+    
+    # Data paths - Use ml-model directory for actual data
+    DATA_DIR = OVERALL_PROJECT_ROOT / 'ml-model' / 'data'
     DATA_RAW = DATA_DIR / 'raw'
     DATA_PROCESSED = DATA_DIR / 'processed'
     DATA_EXTERNAL = DATA_DIR / 'external'
     
-    # Model paths
-    MODELS_DIR = PROJECT_ROOT / 'models'
+    # Model paths - Use ml-model directory for trained models
+    MODELS_DIR = OVERALL_PROJECT_ROOT / 'ml-model' / 'models'
     TABNET_DIR = MODELS_DIR / 'tabnet'
     BAYESIAN_DIR = MODELS_DIR / 'bayesian'
     HYBRID_DIR = MODELS_DIR / 'hybrid'
     
     # Output paths
-    REPORTS_DIR = PROJECT_ROOT / 'reports'
+    REPORTS_DIR = OVERALL_PROJECT_ROOT / 'ml-model' / 'reports'
     FIGURES_DIR = REPORTS_DIR / 'figures'
     
     # Model files

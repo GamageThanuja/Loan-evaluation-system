@@ -395,13 +395,13 @@ export default function LoanApplicationDetails() {
                                     fontSize: '2rem',
                                 }}
                             >
-                                {displayData.firstName[0]}{displayData.lastName[0]}
+                                {displayData.firstName?.[0] || (displayData as any).name?.[0] || 'U'}{displayData.lastName?.[0] || (displayData as any).name?.[1] || 'N'}
                             </Avatar>
                         </Grid>
 
                         <Grid item xs>
                             <Typography variant="h4" fontWeight={700} gutterBottom>
-                                {displayData.firstName} {displayData.lastName}
+                                {displayData.firstName && displayData.lastName ? `${displayData.firstName} ${displayData.lastName}` : (displayData as any).name || 'Unknown'}
                             </Typography>
                             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
                                 <Chip
@@ -552,7 +552,7 @@ export default function LoanApplicationDetails() {
                                             </Box>
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Annual Income</Typography>
-                                                <Typography variant="body2" fontWeight={600}>{formatCurrency(displayData.annualIncome)}</Typography>
+                                                <Typography variant="body2" fontWeight={600}>{formatCurrency(displayData.annualIncome ?? 0)}</Typography>
                                             </Box>
                                         </Box>
                                     </CardContent>
@@ -572,7 +572,7 @@ export default function LoanApplicationDetails() {
                                             </Grid>
                                             <Grid item xs={12} sm={6} md={4}>
                                                 <Typography variant="caption" color="text.secondary">Loan Term</Typography>
-                                                <Typography variant="body2">{displayData.loanTerm} months ({displayData.loanTerm / 12} years)</Typography>
+                                                <Typography variant="body2">{displayData.loanTerm ?? 0} months ({(displayData.loanTerm ?? 0) / 12} years)</Typography>
                                             </Grid>
                                             <Grid item xs={12} sm={6} md={4}>
                                                 <Typography variant="caption" color="text.secondary">Total Payable</Typography>

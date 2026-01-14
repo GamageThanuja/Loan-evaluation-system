@@ -48,7 +48,7 @@ class AuthMiddleware:
         except jwt.ExpiredSignatureError:
             logger.warning("Token has expired")
             return None
-        except jwt.JWTError as e:
+        except (jwt.PyJWTError, jwt.InvalidTokenError, Exception) as e:
             logger.warning(f"JWT validation error: {e}")
             return None
     

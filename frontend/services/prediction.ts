@@ -13,6 +13,11 @@ import {
   ApiResponse,
   PaginatedResponse,
   LoanApplicationDetails,
+  EligibilityResult,
+  PredictionWithReasoning,
+  BayesianNetworkStructure,
+  ScenarioComparison,
+  ModelInfo,
 } from '@/types';
 
 // API Service Methods
@@ -261,6 +266,154 @@ export const predictionService = {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch loan application details',
+      };
+    }
+  },
+
+  // ============================================
+  // ELIGIBILITY & PREDICTION ENDPOINTS
+  // ============================================
+
+  // Check eligibility with ML model reasoning
+  checkEligibility: async (applicantId: number, loanAmount: number, loanTermMonths: number): Promise<ApiResponse<EligibilityResult>> => {
+    try {
+      const response = await apiClient.post('/api/predictions/eligibility', {
+        applicant_id: applicantId,
+        loan_amount: loanAmount,
+        loan_term_months: loanTermMonths
+      });
+      
+      // Get the nested data from API response
+      const apiData = response.data?.data || response.data;
+      
+      // Transform nested API response to flat EligibilityResult structure
+      const transformedData: EligibilityResult = {
+        applicant_id: apiData.applicant_id,
+        eligible: apiData.decision?.eligible ?? false,
+        risk_score: (apiData.decision?.risk_score_percentage ?? 0) / 100, // Convert percentage to decimal
+        probability: (apiData.decision?.risk_score_percentage ?? 0) / 100,
+        decision: apiData.decision?.status || 'REJECT',
+        risk_level: apiData.decision?.risk_level || 'Unknown',
+        summary_explanation: apiData.explanation?.summary || '',
+        risk_factors: (apiData.risk_analysis?.concerns || []).map((c: { factor?: string; explanation?: string; severity?: string }) => ({
+          feature: c.factor || '',
+          description: c.explanation || '',
+          explanation: c.explanation || '',
+          impact: c.severity || 'Medium',
+          is_positive: false
+        })),
+        protective_factors: (apiData.risk_analysis?.positive_factors || []).map((p: { factor?: string; explanation?: string; severity?: string }) => ({
+          feature: p.factor || '',
+          description: p.explanation || '',
+          explanation: p.explanation || '',
+          impact: p.severity || 'Medium',
+          is_positive: true
+        })),
+        recommendations: apiData.recommendations || [],
+        confidence_score: (apiData.model_info?.confidence_score ?? 0) / 100, // Convert percentage to decimal
+        model_type: apiData.model_info?.model_type,
+        // Include raw loan/financial data for "Try Different Parameters" feature
+        loan_details: apiData.loan_details,
+        financial_profile: apiData.financial_profile,
+        raw_decision: apiData.decision,
+        raw_model_info: apiData.model_info
+      };
+      
+      return {
+        success: true,
+        data: transformedData,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to check eligibility',
+      };
+    }
+  },
+
+  // Get prediction with full Bayesian reasoning
+  getPredictionWithReasoning: async (features: Record<string, number>): Promise<ApiResponse<PredictionWithReasoning>> => {
+    try {
+      const response = await apiClient.post('/api/predictions/predict/explain', { features });
+      return {
+        success: true,
+        data: response.data?.reasoning || response.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get prediction with reasoning',
+      };
+    }
+  },
+
+  // Send application for manager review
+  sendForReview: async (applicantId: number, eligibilityResult: EligibilityResult, notes?: string): Promise<ApiResponse<void>> => {
+    try {
+      await apiClient.post(`/api/applicants/${applicantId}/send-for-review`, {
+        applicant_id: applicantId,
+        eligibility_result: eligibilityResult,
+        notes
+      });
+      return {
+        success: true,
+        message: 'Application sent for review successfully',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to send for review',
+      };
+    }
+  },
+
+  // Get Bayesian Network structure for visualization
+  getBayesianNetworkStructure: async (): Promise<ApiResponse<BayesianNetworkStructure>> => {
+    try {
+      const response = await apiClient.get('/api/predictions/explain/network');
+      return {
+        success: true,
+        data: response.data?.network || response.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get network structure',
+      };
+    }
+  },
+
+  // Compare two loan scenarios
+  compareScenarios: async (scenarioA: Record<string, number>, scenarioB: Record<string, number>): Promise<ApiResponse<ScenarioComparison>> => {
+    try {
+      const response = await apiClient.post('/api/predictions/compare', {
+        scenario_a: scenarioA,
+        scenario_b: scenarioB
+      });
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to compare scenarios',
+      };
+    }
+  },
+
+  // Get model information
+  getModelInfo: async (): Promise<ApiResponse<ModelInfo>> => {
+    try {
+      const response = await apiClient.get('/api/predictions/model/info');
+      return {
+        success: true,
+        data: response.data?.data || response.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get model info',
       };
     }
   },

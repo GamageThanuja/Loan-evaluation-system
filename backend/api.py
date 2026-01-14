@@ -42,6 +42,7 @@ from database.client import db
 from routers import auth as auth_module
 from routers import loan_details as loan_details_module
 from routers import applicants as applicants_module
+from routers import predictions as predictions_module
 
 # Setup logging
 setup_logging(
@@ -119,73 +120,8 @@ app.include_router(loan_details_module.router)
 # Mount applicants router (CRUD)
 app.include_router(applicants_module.router)
 
-# ============================================
-# PYDANTIC MODELS
-# ============================================
-
-class PredictionRequest(BaseModel):
-    applicant_id: str
-    features: Dict[str, float]
-
-# ============================================
-# PREDICTION ENDPOINTS
-# ============================================
-
-@app.post("/api/predict")
-async def create_prediction(pred_request: PredictionRequest, request: Request):
-    """Create prediction for applicant"""
-    user = getattr(request.state, "user", None)
-    
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    
-    try:
-        # TODO: Integrate with ML model
-        # For now, return mock prediction
-        from src.inference.api import model, predict_single  # Import from ML model
-        
-        prediction_data = {
-            "applicant_id": pred_request.applicant_id,
-            "risk_score": 0.23,  # Replace with actual model output
-            "confidence": 0.89,
-            "decision": "APPROVE",
-            "shap_explanation": {},  # Add SHAP values
-            "bayesian_network": {},  # Add Bayesian network
-            "business_rules": {},  # Add business rules
-            "input_features": pred_request.features,
-            "model_version": os.getenv("MODEL_VERSION", "2.0.0"),
-            "processing_time_ms": 150
-        }
-        
-        result = db.create_prediction(prediction_data)
-        
-        if not result:
-            raise HTTPException(status_code=500, detail="Failed to create prediction")
-        
-        # Log action
-        db.log_action(
-            user_id=user["sub"],
-            action="CREATE_PREDICTION",
-            resource_type="prediction",
-            resource_id=result["id"]
-        )
-        
-        return {
-            "success": True,
-            "data": result
-        }
-    except Exception as e:
-        logger.error(f"Prediction error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/predictions/recent")
-async def get_recent_predictions(limit: int = 5):
-    """Get recent predictions"""
-    predictions = db.get_recent_predictions(limit=limit)
-    return {
-        "success": True,
-        "data": predictions
-    }
+# Mount predictions router (ML model predictions with reasoning)
+app.include_router(predictions_module.router)
 
 # ============================================
 # DASHBOARD ENDPOINTS
