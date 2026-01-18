@@ -86,11 +86,25 @@ export default function TransactionList({ transactions }: TransactionListProps) 
     const [filterType, setFilterType] = useState<string>('all');
     const [filterStatus, setFilterStatus] = useState<string>('all');
 
+    // Add null safety check
+    if (!transactions || transactions.length === 0) {
+        return (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                    No Transactions Available
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                    Transaction history will appear here once available.
+                </Typography>
+            </Box>
+        );
+    }
+
     // Filter transactions
     const filteredTransactions = transactions.filter((transaction) => {
         const matchesSearch =
-            transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            transaction.referenceNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+            (transaction.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (transaction.referenceNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
         const matchesType = filterType === 'all' || transaction.type === filterType;
         const matchesStatus = filterStatus === 'all' || transaction.status === filterStatus;
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   TextField,
@@ -12,8 +12,12 @@ import {
   FormControl,
   InputLabel,
   CircularProgress,
+  Checkbox,
+  FormControlLabel,
+  IconButton,
+  InputAdornment,
 } from '@mui/material';
-import { LoginOutlined } from '@mui/icons-material';
+import { LoginOutlined, Visibility, VisibilityOff } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
@@ -33,6 +37,22 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<Partial<Record<keyof LoginFormData, string>>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // Load saved email on mount
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('rememberedEmail');
+    const savedRole = localStorage.getItem('rememberedRole');
+    if (savedEmail) {
+      setFormData(prev => ({ 
+        ...prev, 
+        email: savedEmail,
+        role: (savedRole as 'loan_officer' | 'manager') || 'loan_officer'
+      }));
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleChange = (field: keyof LoginFormData) => (
     event: React.ChangeEvent<HTMLInputElement | { value: unknown }>
@@ -47,6 +67,14 @@ export default function LoginPage() {
       setError(null);
       clearError();
     }
+  };
+
+  const handleTogglePassword = () => {
+    setShowPassword((prev) => !prev);
+  };
+
+  const handleRememberMeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRememberMe(event.target.checked);
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -65,6 +93,15 @@ export default function LoginPage() {
       });
       setErrors(fieldErrors);
       return;
+    }
+
+    // Handle remember me
+    if (rememberMe) {
+      localStorage.setItem('rememberedEmail', formData.email);
+      localStorage.setItem('rememberedRole', formData.role);
+    } else {
+      localStorage.removeItem('rememberedEmail');
+      localStorage.removeItem('rememberedRole');
     }
 
     setIsLoading(true);
@@ -110,7 +147,7 @@ export default function LoginPage() {
         <TextField
           fullWidth
           label="Password"
-          type="password"
+          type={showPassword ? 'text' : 'password'}
           value={formData.password}
           onChange={handleChange('password')}
           error={Boolean(errors.password)}
@@ -118,9 +155,23 @@ export default function LoginPage() {
           disabled={isLoading}
           sx={{ mb: 2 }}
           autoComplete="current-password"
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  aria-label="toggle password visibility"
+                  onClick={handleTogglePassword}
+                  edge="end"
+                  disabled={isLoading}
+                >
+                  {showPassword ? <VisibilityOff /> : <Visibility />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
         />
 
-        <FormControl fullWidth sx={{ mb: 3 }} error={Boolean(errors.role)}>
+        <FormControl fullWidth sx={{ mb: 2 }} error={Boolean(errors.role)}>
           <InputLabel>Role</InputLabel>
           <Select
             value={formData.role}
@@ -137,6 +188,19 @@ export default function LoginPage() {
             </Typography>
           )}
         </FormControl>
+
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={rememberMe}
+              onChange={handleRememberMeChange}
+              disabled={isLoading}
+              color="primary"
+            />
+          }
+          label="Remember me"
+          sx={{ mb: 2 }}
+        />
 
         <Button
           fullWidth

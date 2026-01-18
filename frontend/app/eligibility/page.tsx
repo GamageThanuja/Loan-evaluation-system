@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { applicantKeys } from '@/hooks/useApplicants';
 import {
   Box,
   Typography,
@@ -60,10 +62,13 @@ const processingMessages = [
 ];
 
 export default function EligibilityPage() {
+  // React Query client for cache invalidation
+  const queryClient = useQueryClient();
+
   // Applicants state
   const [applicants, setApplicants] = useState<ApplicantOption[]>([]);
   const [loadingApplicants, setLoadingApplicants] = useState(true);
-  
+
   // Form state
   const [selectedApplicant, setSelectedApplicant] = useState<ApplicantOption | null>(null);
   const [loanAmount, setLoanAmount] = useState<string>('');
@@ -97,8 +102,35 @@ export default function EligibilityPage() {
       }
     };
 
+
     fetchApplicants();
   }, []);
+
+  // Auto-fill loan amount and duration when applicant is selected
+  useEffect(() => {
+    const fetchApplicantDetails = async () => {
+      if (!selectedApplicant) return;
+
+      try {
+        const response = await predictionService.getApplicant(selectedApplicant.id);
+        if (response.success && response.data) {
+          const applicant = response.data;
+          // Auto-fill loan amount if available
+          if (applicant.loanAmount && applicant.loanAmount > 0) {
+            setLoanAmount(applicant.loanAmount.toString());
+          }
+          // Auto-fill loan term if available
+          if (applicant.loanTermMonths && applicant.loanTermMonths > 0) {
+            setLoanDuration(applicant.loanTermMonths);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch applicant details:', error);
+      }
+    };
+
+    fetchApplicantDetails();
+  }, [selectedApplicant]);
 
   // Cycle through processing messages
   useEffect(() => {
@@ -148,12 +180,15 @@ export default function EligibilityPage() {
       if (response.success && response.data) {
         const result = response.data;
         setEvaluationResult(result);
-        
+
         if (result.eligible) {
           setEvaluationStatus('eligible');
         } else {
           setEvaluationStatus('not-eligible');
         }
+
+        // Invalidate applicants cache to refresh the list with updated eligibility status
+        queryClient.invalidateQueries({ queryKey: applicantKeys.lists() });
       } else {
         setApiError(response.error || 'Failed to check eligibility');
         setEvaluationStatus('idle');
@@ -177,6 +212,9 @@ export default function EligibilityPage() {
 
       if (response.success) {
         setSentForReview(true);
+
+        // Invalidate applicants cache to refresh the list with updated review status
+        queryClient.invalidateQueries({ queryKey: applicantKeys.lists() });
       } else {
         setApiError(response.error || 'Failed to send for review');
       }
@@ -215,7 +253,7 @@ export default function EligibilityPage() {
 
     // Parse recommendations to extract suggestions
     const recommendations = evaluationResult.recommendations || [];
-    
+
     recommendations.forEach((rec: string) => {
       // Look for loan amount suggestions (e.g., "up to LKR 6.44 Million")
       const amountMatch = rec.match(/up to LKR\s*([\d.]+)\s*(Million|K)?/i);
@@ -244,12 +282,12 @@ export default function EligibilityPage() {
       // Target 35% of monthly income for payment
       const targetPaymentRatio = 0.35;
       const affordableMonthlyPayment = financialProfile.monthly_income * targetPaymentRatio;
-      
+
       // If duration wasn't suggested, try extending to 60 months
       if (suggestedDuration === currentDuration) {
         suggestedDuration = Math.min(60, Math.max(currentDuration, 36));
       }
-      
+
       // Calculate affordable amount based on new duration
       const affordableAmount = affordableMonthlyPayment * suggestedDuration;
       suggestedAmount = Math.min(suggestedAmount, affordableAmount);
@@ -260,7 +298,7 @@ export default function EligibilityPage() {
 
     // Find closest valid duration
     const validDurations = [6, 12, 24, 36, 48, 60, 84, 120];
-    suggestedDuration = validDurations.reduce((prev, curr) => 
+    suggestedDuration = validDurations.reduce((prev, curr) =>
       Math.abs(curr - suggestedDuration) < Math.abs(prev - suggestedDuration) ? curr : prev
     );
 
@@ -347,7 +385,7 @@ export default function EligibilityPage() {
                       </Box>
                     )}
                     noOptionsText={
-                      applicants.length === 0 
+                      applicants.length === 0
                         ? "No applicants found. Please add applicants first."
                         : "No matching applicants"
                     }
@@ -431,10 +469,10 @@ export default function EligibilityPage() {
           {/* Processing State */}
           {evaluationStatus === 'processing' && (
             <Fade in>
-              <Card sx={{ 
-                height: '100%', 
-                display: 'flex', 
-                flexDirection: 'column', 
+              <Card sx={{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
                 justifyContent: 'center',
                 alignItems: 'center',
                 py: 8,
@@ -451,7 +489,7 @@ export default function EligibilityPage() {
                     <CircularProgress
                       size={100}
                       thickness={2}
-                      sx={{ 
+                      sx={{
                         color: 'white',
                         position: 'absolute',
                         left: 0,
@@ -473,7 +511,7 @@ export default function EligibilityPage() {
           {/* Eligible Result */}
           {evaluationStatus === 'eligible' && evaluationResult && !sentForReview && (
             <Fade in>
-              <Card sx={{ 
+              <Card sx={{
                 height: '100%',
                 background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
                 color: 'white',
@@ -484,7 +522,7 @@ export default function EligibilityPage() {
                     <Typography variant="h4" fontWeight={700} gutterBottom>
                       ELIGIBLE
                     </Typography>
-                    <Chip 
+                    <Chip
                       label={evaluationResult.risk_level}
                       color="default"
                       sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}
@@ -515,7 +553,7 @@ export default function EligibilityPage() {
                             <ListItemIcon sx={{ minWidth: 28 }}>
                               <CheckCircle sx={{ fontSize: 16, color: 'white' }} />
                             </ListItemIcon>
-                            <ListItemText 
+                            <ListItemText
                               primary={factor.explanation}
                               primaryTypographyProps={{ variant: 'body2' }}
                             />
@@ -535,7 +573,7 @@ export default function EligibilityPage() {
                       <List dense sx={{ py: 0 }}>
                         {evaluationResult.recommendations.slice(0, 2).map((rec, idx) => (
                           <ListItem key={idx} sx={{ py: 0.5, px: 0 }}>
-                            <ListItemText 
+                            <ListItemText
                               primary={`• ${rec}`}
                               primaryTypographyProps={{ variant: 'body2' }}
                             />
@@ -585,7 +623,7 @@ export default function EligibilityPage() {
           {/* Sent for Review Confirmation */}
           {sentForReview && (
             <Fade in>
-              <Card sx={{ 
+              <Card sx={{
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
@@ -608,8 +646,8 @@ export default function EligibilityPage() {
                     variant="outlined"
                     size="large"
                     onClick={handleReset}
-                    sx={{ 
-                      color: 'white', 
+                    sx={{
+                      color: 'white',
                       borderColor: 'white',
                       '&:hover': { borderColor: 'white', bgcolor: 'rgba(255,255,255,0.1)' }
                     }}
@@ -624,7 +662,7 @@ export default function EligibilityPage() {
           {/* Not Eligible Result */}
           {evaluationStatus === 'not-eligible' && evaluationResult && (
             <Fade in>
-              <Card sx={{ 
+              <Card sx={{
                 height: '100%',
                 background: 'linear-gradient(135deg, #eb3349 0%, #f45c43 100%)',
                 color: 'white',
@@ -635,7 +673,7 @@ export default function EligibilityPage() {
                     <Typography variant="h4" fontWeight={700} gutterBottom>
                       NOT ELIGIBLE
                     </Typography>
-                    <Chip 
+                    <Chip
                       label={evaluationResult.risk_level}
                       color="default"
                       sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}
@@ -666,7 +704,7 @@ export default function EligibilityPage() {
                             <ListItemIcon sx={{ minWidth: 28 }}>
                               <Warning sx={{ fontSize: 16, color: 'white' }} />
                             </ListItemIcon>
-                            <ListItemText 
+                            <ListItemText
                               primary={factor.explanation}
                               primaryTypographyProps={{ variant: 'body2' }}
                             />
@@ -686,7 +724,7 @@ export default function EligibilityPage() {
                       <List dense sx={{ py: 0 }}>
                         {evaluationResult.recommendations.map((rec, idx) => (
                           <ListItem key={idx} sx={{ py: 0.5, px: 0 }}>
-                            <ListItemText 
+                            <ListItemText
                               primary={`• ${rec}`}
                               primaryTypographyProps={{ variant: 'body2' }}
                             />
@@ -719,8 +757,8 @@ export default function EligibilityPage() {
                     size="large"
                     fullWidth
                     onClick={handleTryDifferentParameters}
-                    sx={{ 
-                      color: 'white', 
+                    sx={{
+                      color: 'white',
                       borderColor: 'white',
                       '&:hover': { borderColor: 'white', bgcolor: 'rgba(255,255,255,0.1)' }
                     }}
@@ -734,7 +772,7 @@ export default function EligibilityPage() {
 
           {/* Initial State */}
           {evaluationStatus === 'idle' && (
-            <Card sx={{ 
+            <Card sx={{
               height: '100%',
               display: 'flex',
               flexDirection: 'column',

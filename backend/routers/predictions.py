@@ -863,7 +863,6 @@ async def check_eligibility(
         # Update applicant eligibility status in database
         eligibility_data = {
             "eligibility_status": "eligible" if eligible else "not_eligible",
-            "risk_score": round(probability, 4),
             "updated_at": datetime.utcnow().isoformat()
         }
         db.update_applicant(request.applicant_id, eligibility_data)

@@ -388,7 +388,7 @@ export interface RepaymentSummary {
   overdueAmount: number;
   numberOfPayments: number;
   paymentsCompleted: number;
-  paymentStatus: 'on_time' | 'late' | 'defaulted' | 'completed';
+  paymentStatus: 'on_time' | 'late' | 'defaulted' | 'completed' | 'current' | 'pending';
 }
 
 // Credit History

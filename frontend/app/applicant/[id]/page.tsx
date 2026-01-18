@@ -18,6 +18,7 @@ import {
   Tabs,
   Tab,
   Paper,
+  CircularProgress,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -29,15 +30,18 @@ import {
   Assessment,
   Psychology,
   Lightbulb,
+  PlayArrow,
 } from '@mui/icons-material';
 import { useRouter, useParams } from 'next/navigation';
-import { useApplicant, usePrediction, useApproveLoan, useRejectLoan } from '@/hooks/usePrediction';
+import { useApplicant, useApproveLoan, useRejectLoan } from '@/hooks/usePrediction';
 import { useAuth } from '@/hooks/useAuth';
 import { DetailSkeleton } from '@/components/ui/LoadingSkeleton';
 import RiskAssessment from '@/components/loan/RiskAssessment';
 import BayesianReasoning from '@/components/loan/BayesianReasoning';
 import MitigationSuggestions from '@/components/loan/MitigationSuggestions';
 import { formatCurrency, getRiskLevel } from '@/lib/utils';
+import predictionService from '@/services/prediction';
+import { Applicant } from '@/types';
 
 export default function ApplicantDetailPage() {
   const router = useRouter();
@@ -45,8 +49,7 @@ export default function ApplicantDetailPage() {
   const applicantId = params.id as string;
   const { isManager } = useAuth();
 
-  const { data: applicant, isLoading: applicantLoading } = useApplicant(applicantId);
-  const { data: prediction, isLoading: predictionLoading } = usePrediction(applicantId);
+  const { data: applicant, isLoading: applicantLoading, refetch: refetchApplicant } = useApplicant(applicantId);
   const approveLoan = useApproveLoan();
   const rejectLoan = useRejectLoan();
 
@@ -54,20 +57,79 @@ export default function ApplicantDetailPage() {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [activeTab, setActiveTab] = useState(0);
+  const [checkingEligibility, setCheckingEligibility] = useState(false);
+  const [eligibilityError, setEligibilityError] = useState<string | null>(null);
 
-  if (applicantLoading || predictionLoading) {
+  if (applicantLoading) {
     return <DetailSkeleton />;
   }
 
-  if (!applicant || !prediction) {
+  if (!applicant) {
     return (
       <Alert severity="error">
-        Applicant or prediction not found
+        Applicant not found
       </Alert>
     );
   }
 
-  const riskLevel = getRiskLevel(prediction.riskScore);
+  // Check if we have prediction data (from applicant response or previous check)
+  const applicantData = applicant as Applicant & { 
+    prediction_confidence?: number;
+    loan_term_months?: number;
+  };
+  const hasPrediction = applicant.riskScore !== undefined && applicant.riskScore !== null;
+  const riskScore = applicant.riskScore ?? 0;
+  const riskLevel = getRiskLevel(riskScore);
+  const decision: 'APPROVE' | 'REJECT' | 'MANUAL_REVIEW' = 
+    applicant.eligibilityStatus === 'eligible' ? 'APPROVE' : 
+    applicant.eligibilityStatus === 'not_eligible' ? 'REJECT' : 'MANUAL_REVIEW';
+  const confidence = applicantData.prediction_confidence ?? 0.5;
+
+  // Build a prediction-like object for components
+  const prediction = {
+    riskScore,
+    decision,
+    confidence,
+    bayesianNetwork: {
+      nodes: [],
+      edges: [],
+      causalPaths: []
+    },
+    businessRules: applicant.eligibilityReasons?.map((reason: string) => ({
+      id: reason,
+      rule: reason,
+      description: reason,
+      triggered: true,
+      passed: false,
+      severity: 'warning' as const,
+      recommendation: reason,
+      actionRequired: true
+    })) || []
+  };
+
+  const handleRunEligibilityCheck = async () => {
+    setCheckingEligibility(true);
+    setEligibilityError(null);
+    
+    try {
+      const response = await predictionService.checkEligibility(
+        parseInt(applicantId),
+        applicant.loanAmount,
+        applicant.loanTermMonths ?? applicantData.loan_term_months ?? 12
+      );
+      
+      if (response.success) {
+        await refetchApplicant();
+      } else {
+        setEligibilityError(response.error || 'Failed to check eligibility');
+      }
+    } catch (error) {
+      setEligibilityError('An error occurred while checking eligibility');
+      console.error('Eligibility check error:', error);
+    } finally {
+      setCheckingEligibility(false);
+    }
+  };
 
   const handleApprove = async () => {
     try {
@@ -107,7 +169,7 @@ export default function ApplicantDetailPage() {
             </Typography>
           </Box>
           <Chip
-            label={applicant.status.toUpperCase()}
+            label={(applicant.status || 'pending').toUpperCase()}
             color={
               applicant.status === 'approved'
                 ? 'success'
@@ -119,28 +181,73 @@ export default function ApplicantDetailPage() {
         </Box>
       </Box>
 
-      {/* Decision Banner */}
-      <Alert
-        severity={
-          prediction.decision === 'APPROVE'
-            ? 'success'
-            : prediction.decision === 'REJECT'
-              ? 'error'
-              : 'warning'
-        }
-        sx={{ mb: 3 }}
-      >
-        <Typography variant="h6" fontWeight={600}>
-          Recommendation: {prediction.decision}
-        </Typography>
-        <Typography variant="body2">
-          {prediction.decision === 'APPROVE'
-            ? 'The model recommends approving this loan application.'
-            : prediction.decision === 'REJECT'
-              ? 'The model recommends rejecting this loan application.'
-              : 'This application requires manual review by a loan officer.'}
-        </Typography>
-      </Alert>
+      {/* Eligibility Error */}
+      {eligibilityError && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setEligibilityError(null)}>
+          {eligibilityError}
+        </Alert>
+      )}
+
+      {/* Run Eligibility Check Card - Show if not checked yet */}
+      {!hasPrediction && (
+        <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box>
+                <Typography variant="h6" fontWeight={600} sx={{ color: 'white', mb: 0.5 }}>
+                  Eligibility Not Checked Yet
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                  Run the AI-powered eligibility check to get a loan recommendation
+                </Typography>
+              </Box>
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={checkingEligibility ? <CircularProgress size={20} color="inherit" /> : <PlayArrow />}
+                onClick={handleRunEligibilityCheck}
+                disabled={checkingEligibility}
+                sx={{
+                  bgcolor: 'white',
+                  color: '#f5576c',
+                  fontWeight: 600,
+                  px: 3,
+                  '&:hover': {
+                    bgcolor: 'rgba(255, 255, 255, 0.9)',
+                  },
+                }}
+              >
+                {checkingEligibility ? 'Checking...' : 'Run Eligibility Check'}
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Decision Banner - Show if eligibility was checked */}
+      {hasPrediction && (
+        <Alert
+          severity={
+            prediction.decision === 'APPROVE'
+              ? 'success'
+              : prediction.decision === 'REJECT'
+                ? 'error'
+                : 'warning'
+          }
+          sx={{ mb: 3 }}
+        >
+          <Typography variant="h6" fontWeight={600}>
+            Recommendation: {prediction.decision}
+          </Typography>
+          <Typography variant="body2">
+            {prediction.decision === 'APPROVE'
+              ? 'The model recommends approving this loan application.'
+              : prediction.decision === 'REJECT'
+                ? 'The model recommends rejecting this loan application.'
+                : 'This application requires manual review by a loan officer.'}
+          </Typography>
+        </Alert>
+      )}
 
       {/* View Detailed Information Button */}
       <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>

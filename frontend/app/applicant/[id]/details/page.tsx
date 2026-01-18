@@ -17,7 +17,6 @@ import {
     Avatar,
     CircularProgress,
     Alert,
-    Skeleton,
 } from '@mui/material';
 import {
     ArrowBack,
@@ -43,185 +42,6 @@ import {
     useRepaymentHistory,
     useAuditTrail,
 } from '@/hooks/useApplicants';
-
-// Fallback mock data - used when API is not available
-const mockLoanData = {
-    id: '1',
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    phone: '(555) 123-4567',
-    dateOfBirth: '1990-05-15',
-    age: 34,
-    gender: 'M' as const,
-    maritalStatus: 'Married' as const,
-    dependents: 2,
-    annualIncome: 75000,
-    employmentType: 'Employed' as const,
-    employmentLength: 8,
-    creditScore: 720,
-    loanAmount: 250000,
-    loanPurpose: 'Home' as const,
-    loanTerm: 360,
-    interestRate: 4.5,
-    monthlyPayment: 1266.71,
-    totalPayable: 456195.60,
-    disbursementDate: '2024-01-15',
-    maturityDate: '2054-01-15',
-    createdAt: '2024-01-01T10:00:00Z',
-    updatedAt: '2024-01-15T14:30:00Z',
-    status: 'approved' as const,
-
-    auditLog: [
-        {
-            id: '1',
-            timestamp: '2024-01-15T14:30:00Z',
-            action: 'approved' as const,
-            performedBy: { id: '1', name: 'Jane Smith', role: 'loan_officer' as const },
-            description: 'Loan application approved and disbursed',
-            metadata: { amount: 250000 },
-        },
-        {
-            id: '2',
-            timestamp: '2024-01-10T11:20:00Z',
-            action: 'reviewed' as const,
-            performedBy: { id: '2', name: 'Mike Johnson', role: 'manager' as const },
-            description: 'Application reviewed and recommended for approval',
-        },
-        {
-            id: '3',
-            timestamp: '2024-01-05T09:15:00Z',
-            action: 'status_changed' as const,
-            performedBy: { id: '1', name: 'Jane Smith', role: 'loan_officer' as const },
-            description: 'Status changed from pending to under_review',
-            changes: [
-                { field: 'status', oldValue: 'pending', newValue: 'under_review' },
-            ],
-        },
-        {
-            id: '4',
-            timestamp: '2024-01-01T10:00:00Z',
-            action: 'created' as const,
-            performedBy: { id: '1', name: 'Jane Smith', role: 'loan_officer' as const },
-            description: 'Loan application created',
-        },
-    ],
-
-    repaymentSchedule: Array.from({ length: 12 }, (_, i) => ({
-        id: `payment-${i + 1}`,
-        loanId: '1',
-        installmentNumber: i + 1,
-        dueDate: new Date(2024, i + 1, 15).toISOString(),
-        principalAmount: 937.50,
-        interestAmount: 329.21,
-        totalAmount: 1266.71,
-        status: i < 3 ? ('paid' as const) : i === 3 ? ('overdue' as const) : ('pending' as const),
-        paidAmount: i < 3 ? 1266.71 : undefined,
-        paidDate: i < 3 ? new Date(2024, i + 1, 14).toISOString() : undefined,
-        lateFee: i === 3 ? 25 : undefined,
-        remainingBalance: 250000 - (937.50 * (i + 1)),
-    })),
-
-    repaymentSummary: {
-        totalLoanAmount: 250000,
-        totalPaid: 3800.13,
-        totalRemaining: 246199.87,
-        totalInterest: 206195.60,
-        nextPaymentDue: new Date(2024, 4, 15).toISOString(),
-        nextPaymentAmount: 1291.71,
-        overdueAmount: 1291.71,
-        numberOfPayments: 360,
-        paymentsCompleted: 3,
-        paymentStatus: 'late' as const,
-    },
-
-    creditProfile: {
-        currentScore: 720,
-        scoreHistory: [
-            { id: '1', date: '2024-01-01', creditScore: 720, bureau: 'Experian' as const, change: 5 },
-            { id: '2', date: '2023-10-01', creditScore: 715, bureau: 'Equifax' as const, change: -3 },
-            { id: '3', date: '2023-07-01', creditScore: 718, bureau: 'TransUnion' as const, change: 8 },
-            { id: '4', date: '2023-04-01', creditScore: 710, bureau: 'Experian' as const, change: 0 },
-            { id: '5', date: '2023-01-01', creditScore: 710, bureau: 'Equifax' as const },
-        ],
-        creditUtilization: 0.28,
-        totalCreditLines: 5,
-        oldestAccount: '2015-03-20',
-        recentInquiries: 2,
-        delinquencies: 0,
-        publicRecords: 0,
-        averageAccountAge: 6.5,
-    },
-
-    transactions: [
-        {
-            id: '1',
-            date: '2024-04-14',
-            type: 'payment' as const,
-            amount: 1266.71,
-            description: 'Monthly payment - Installment #3',
-            status: 'completed' as const,
-            paymentMethod: 'bank_transfer' as const,
-            referenceNumber: 'TXN-2024-0414-001',
-            balance: 247187.50,
-        },
-        {
-            id: '2',
-            date: '2024-03-14',
-            type: 'payment' as const,
-            amount: 1266.71,
-            description: 'Monthly payment - Installment #2',
-            status: 'completed' as const,
-            paymentMethod: 'bank_transfer' as const,
-            referenceNumber: 'TXN-2024-0314-001',
-            balance: 248125.00,
-        },
-        {
-            id: '3',
-            date: '2024-02-14',
-            type: 'payment' as const,
-            amount: 1266.71,
-            description: 'Monthly payment - Installment #1',
-            status: 'completed' as const,
-            paymentMethod: 'online' as const,
-            referenceNumber: 'TXN-2024-0214-001',
-            balance: 249062.50,
-        },
-        {
-            id: '4',
-            date: '2024-01-20',
-            type: 'fee' as const,
-            amount: 500,
-            description: 'Loan processing fee',
-            status: 'completed' as const,
-            referenceNumber: 'FEE-2024-001',
-            balance: 250000,
-        },
-        {
-            id: '5',
-            date: '2024-01-15',
-            type: 'disbursement' as const,
-            amount: 250000,
-            description: 'Loan disbursement',
-            status: 'completed' as const,
-            paymentMethod: 'bank_transfer' as const,
-            referenceNumber: 'DISB-2024-001',
-            balance: 250000,
-        },
-    ],
-
-    transactionSummary: {
-        totalTransactions: 5,
-        totalDebits: 4300.13,
-        totalCredits: 250000,
-        monthlyTransactions: [
-            { month: 'Jan 2024', count: 2, amount: 250500 },
-            { month: 'Feb 2024', count: 1, amount: 1266.71 },
-            { month: 'Mar 2024', count: 1, amount: 1266.71 },
-            { month: 'Apr 2024', count: 1, amount: 1266.71 },
-        ],
-    },
-};
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -250,17 +70,6 @@ export default function LoanApplicationDetails() {
     const { data: repaymentHistory, isLoading: isLoadingRepayment } = useRepaymentHistory(applicantId);
     const { data: auditLog, isLoading: isLoadingAudit } = useAuditTrail(applicantId);
 
-    // Use API data if available, otherwise fall back to mock
-    const displayData = applicant || mockLoanData;
-    const displayLoanDetails = loanDetails || mockLoanData;
-    const displayCreditHistory = creditHistory || mockLoanData.creditProfile;
-    const displayRepaymentHistory = repaymentHistory || {
-        schedule: mockLoanData.repaymentSchedule,
-        summary: mockLoanData.repaymentSummary
-    };
-    const displayAuditLog = auditLog || mockLoanData.auditLog;
-    const displayTransactions = loanDetails?.transactions || mockLoanData.transactions;
-
     const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
         setActiveTab(newValue);
     };
@@ -268,7 +77,7 @@ export default function LoanApplicationDetails() {
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
-            currency: 'USD',
+            currency: 'LKR',
         }).format(amount);
     };
 
@@ -372,6 +181,18 @@ export default function LoanApplicationDetails() {
         );
     }
 
+    // Show error if applicant not found
+    if (!applicant) {
+        return (
+            <Box sx={{ p: 4 }}>
+                <Button startIcon={<ArrowBack />} onClick={() => router.back()} sx={{ mb: 2 }}>
+                    Back to Applications
+                </Button>
+                <Alert severity="error">Applicant not found</Alert>
+            </Box>
+        );
+    }
+
     return (
         <Box>
             {/* Header */}
@@ -395,31 +216,31 @@ export default function LoanApplicationDetails() {
                                     fontSize: '2rem',
                                 }}
                             >
-                                {displayData.firstName?.[0] || (displayData as any).name?.[0] || 'U'}{displayData.lastName?.[0] || (displayData as any).name?.[1] || 'N'}
+                                {applicant.firstName?.[0] || (applicant as any).name?.[0] || 'U'}{applicant.lastName?.[0] || ''}
                             </Avatar>
                         </Grid>
 
                         <Grid item xs>
                             <Typography variant="h4" fontWeight={700} gutterBottom>
-                                {displayData.firstName && displayData.lastName ? `${displayData.firstName} ${displayData.lastName}` : (displayData as any).name || 'Unknown'}
+                                {applicant.firstName && applicant.lastName ? `${applicant.firstName} ${applicant.lastName}` : (applicant as any).name || 'Unknown'}
                             </Typography>
                             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
                                 <Chip
-                                    label={displayData.status.toUpperCase().replace('_', ' ')}
-                                    color={getStatusColor(displayData.status)}
+                                    label={(applicant.status || 'pending').toUpperCase().replace('_', ' ')}
+                                    color={getStatusColor(applicant.status || 'pending')}
                                     size="small"
-                                    icon={getStatusIcon(displayData.status)}
+                                    icon={getStatusIcon(applicant.status || 'pending')}
                                 />
                                 <Chip
-                                    label={`Loan ID: ${displayData.id}`}
+                                    label={`Loan ID: ${applicant.id}`}
                                     variant="outlined"
                                     size="small"
                                 />
                                 <Typography variant="body2" color="text.secondary">
-                                    {displayData.email}
+                                    {applicant.email}
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
-                                    {displayData.phone}
+                                    {applicant.phone}
                                 </Typography>
                             </Box>
                         </Grid>
@@ -435,7 +256,7 @@ export default function LoanApplicationDetails() {
                                     Loan Amount
                                 </Typography>
                                 <Typography variant="h6" fontWeight={600}>
-                                    {formatCurrency(displayData.loanAmount)}
+                                    {formatCurrency(applicant.loanAmount || 0)}
                                 </Typography>
                             </Box>
                         </Grid>
@@ -445,7 +266,7 @@ export default function LoanApplicationDetails() {
                                     Interest Rate
                                 </Typography>
                                 <Typography variant="h6" fontWeight={600}>
-                                    {displayLoanDetails.interestRate}%
+                                    {loanDetails?.interestRate ?? (applicant as any).interestRate ?? 'N/A'}%
                                 </Typography>
                             </Box>
                         </Grid>
@@ -455,7 +276,7 @@ export default function LoanApplicationDetails() {
                                     Monthly Payment
                                 </Typography>
                                 <Typography variant="h6" fontWeight={600}>
-                                    {formatCurrency(displayLoanDetails.monthlyPayment)}
+                                    {formatCurrency(loanDetails?.monthlyPayment ?? (applicant as any).monthlyPayment ?? 0)}
                                 </Typography>
                             </Box>
                         </Grid>
@@ -465,7 +286,7 @@ export default function LoanApplicationDetails() {
                                     Credit Score
                                 </Typography>
                                 <Typography variant="h6" fontWeight={600} color="success.main">
-                                    {displayData.creditScore}
+                                    {applicant.creditScore ?? 'N/A'}
                                 </Typography>
                             </Box>
                         </Grid>
@@ -477,7 +298,7 @@ export default function LoanApplicationDetails() {
             {getEligibilityInfo()}
 
             {/* Rejection Reason (if rejected) */}
-            {displayData.status === 'rejected' && (applicant as any)?.rejectionReason && (
+            {applicant.status === 'rejected' && (applicant as any)?.rejectionReason && (
                 <Alert severity="error" sx={{ mb: 2 }}>
                     <Typography variant="subtitle2" fontWeight={600}>Rejection Reason:</Typography>
                     <Typography variant="body2">{(applicant as any).rejectionReason}</Typography>
@@ -516,19 +337,19 @@ export default function LoanApplicationDetails() {
                                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Date of Birth</Typography>
-                                                <Typography variant="body2">{new Date(displayData.dateOfBirth).toLocaleDateString()}</Typography>
+                                                <Typography variant="body2">{applicant.dateOfBirth ? new Date(applicant.dateOfBirth).toLocaleDateString() : 'N/A'}</Typography>
                                             </Box>
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Age</Typography>
-                                                <Typography variant="body2">{displayData.age} years</Typography>
+                                                <Typography variant="body2">{applicant.age ?? 'N/A'} years</Typography>
                                             </Box>
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Marital Status</Typography>
-                                                <Typography variant="body2">{displayData.maritalStatus}</Typography>
+                                                <Typography variant="body2">{applicant.maritalStatus ?? 'N/A'}</Typography>
                                             </Box>
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Dependents</Typography>
-                                                <Typography variant="body2">{displayData.dependents}</Typography>
+                                                <Typography variant="body2">{applicant.dependents ?? 'N/A'}</Typography>
                                             </Box>
                                         </Box>
                                     </CardContent>
@@ -544,15 +365,15 @@ export default function LoanApplicationDetails() {
                                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Employment Type</Typography>
-                                                <Typography variant="body2">{displayData.employmentType}</Typography>
+                                                <Typography variant="body2">{applicant.employmentType ?? 'N/A'}</Typography>
                                             </Box>
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Employment Length</Typography>
-                                                <Typography variant="body2">{displayData.employmentLength} years</Typography>
+                                                <Typography variant="body2">{applicant.employmentLength ?? 'N/A'} years</Typography>
                                             </Box>
                                             <Box>
-                                                <Typography variant="caption" color="text.secondary">Annual Income</Typography>
-                                                <Typography variant="body2" fontWeight={600}>{formatCurrency(displayData.annualIncome ?? 0)}</Typography>
+                                                <Typography variant="caption" color="text.secondary">Monthly Income</Typography>
+                                                <Typography variant="body2" fontWeight={600}>{formatCurrency((applicant as any).monthlyIncome ?? 0)}</Typography>
                                             </Box>
                                         </Box>
                                     </CardContent>
@@ -568,26 +389,26 @@ export default function LoanApplicationDetails() {
                                         <Grid container spacing={2}>
                                             <Grid item xs={12} sm={6} md={4}>
                                                 <Typography variant="caption" color="text.secondary">Loan Purpose</Typography>
-                                                <Typography variant="body2">{displayData.loanPurpose}</Typography>
+                                                <Typography variant="body2">{applicant.loanPurpose ?? 'N/A'}</Typography>
                                             </Grid>
                                             <Grid item xs={12} sm={6} md={4}>
                                                 <Typography variant="caption" color="text.secondary">Loan Term</Typography>
-                                                <Typography variant="body2">{displayData.loanTerm ?? 0} months ({(displayData.loanTerm ?? 0) / 12} years)</Typography>
+                                                <Typography variant="body2">{(applicant as any).loanTermMonths ?? applicant.loanTerm ?? 0} months</Typography>
                                             </Grid>
                                             <Grid item xs={12} sm={6} md={4}>
                                                 <Typography variant="caption" color="text.secondary">Total Payable</Typography>
-                                                <Typography variant="body2" fontWeight={600}>{formatCurrency(displayLoanDetails.totalPayable)}</Typography>
+                                                <Typography variant="body2" fontWeight={600}>{formatCurrency(loanDetails?.totalPayable ?? 0)}</Typography>
                                             </Grid>
-                                            {displayLoanDetails.disbursementDate && (
+                                            {loanDetails?.disbursementDate && (
                                                 <Grid item xs={12} sm={6} md={4}>
                                                     <Typography variant="caption" color="text.secondary">Disbursement Date</Typography>
-                                                    <Typography variant="body2">{new Date(displayLoanDetails.disbursementDate!).toLocaleDateString()}</Typography>
+                                                    <Typography variant="body2">{new Date(loanDetails.disbursementDate).toLocaleDateString()}</Typography>
                                                 </Grid>
                                             )}
-                                            {displayLoanDetails.maturityDate && (
+                                            {loanDetails?.maturityDate && (
                                                 <Grid item xs={12} sm={6} md={4}>
                                                     <Typography variant="caption" color="text.secondary">Maturity Date</Typography>
-                                                    <Typography variant="body2">{new Date(displayLoanDetails.maturityDate!).toLocaleDateString()}</Typography>
+                                                    <Typography variant="body2">{new Date(loanDetails.maturityDate).toLocaleDateString()}</Typography>
                                                 </Grid>
                                             )}
                                         </Grid>
@@ -602,11 +423,13 @@ export default function LoanApplicationDetails() {
                             <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                                 <CircularProgress />
                             </Box>
-                        ) : (
+                        ) : repaymentHistory ? (
                             <RepaymentHistory
-                                schedule={displayRepaymentHistory.schedule}
-                                summary={displayRepaymentHistory.summary}
+                                schedule={repaymentHistory.schedule}
+                                summary={repaymentHistory.summary}
                             />
+                        ) : (
+                            <Alert severity="info">No repayment history available for this applicant.</Alert>
                         )}
                     </TabPanel>
 
@@ -615,8 +438,10 @@ export default function LoanApplicationDetails() {
                             <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                                 <CircularProgress />
                             </Box>
+                        ) : creditHistory ? (
+                            <CreditHistory creditProfile={creditHistory} />
                         ) : (
-                            <CreditHistory creditProfile={displayCreditHistory} />
+                            <Alert severity="info">No credit history available for this applicant.</Alert>
                         )}
                     </TabPanel>
 
@@ -625,8 +450,10 @@ export default function LoanApplicationDetails() {
                             <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                                 <CircularProgress />
                             </Box>
+                        ) : loanDetails?.transactions && loanDetails.transactions.length > 0 ? (
+                            <TransactionList transactions={loanDetails.transactions} />
                         ) : (
-                            <TransactionList transactions={displayTransactions} />
+                            <Alert severity="info">No transaction history available for this applicant.</Alert>
                         )}
                     </TabPanel>
 
@@ -635,8 +462,10 @@ export default function LoanApplicationDetails() {
                             <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                                 <CircularProgress />
                             </Box>
+                        ) : auditLog && auditLog.length > 0 ? (
+                            <AuditTrail auditLog={auditLog} />
                         ) : (
-                            <AuditTrail auditLog={displayAuditLog} />
+                            <Alert severity="info">No audit trail available for this applicant.</Alert>
                         )}
                     </TabPanel>
                 </Box>

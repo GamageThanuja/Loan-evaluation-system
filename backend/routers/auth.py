@@ -52,12 +52,14 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr = Field(..., description="User email address")
     password: str = Field(..., description="User password")
+    role: Optional[str] = Field(None, description="User role (optional, for validation)")
     
     class Config:
         schema_extra = {
             "example": {
                 "email": "john.doe@example.com",
-                "password": "SecurePass123!"
+                "password": "SecurePass123!",
+                "role": "loan_officer"
             }
         }
 
@@ -180,6 +182,7 @@ async def login(request: LoginRequest):
     
     - **email**: Registered email address
     - **password**: User password
+    - **role**: Optional role for validation
     
     Returns JWT token and user information
     """
@@ -206,6 +209,16 @@ async def login(request: LoginRequest):
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password"
             )
+        
+        # Validate role if provided
+        if request.role:
+            user_role = user.get("role", "").lower()
+            requested_role = request.role.lower()
+            if user_role != requested_role:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"You are not authorized to login as {request.role}. Your role is {user_role}."
+                )
         
         # Update last login
         db.update_user_last_login(user["id"])

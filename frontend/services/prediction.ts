@@ -20,6 +20,18 @@ import {
   ModelInfo,
 } from '@/types';
 
+// Helper to convert snake_case to camelCase
+const toCamelCase = (obj: any): any => {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(toCamelCase);
+  
+  return Object.keys(obj).reduce((acc, key) => {
+    const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+    acc[camelKey] = toCamelCase(obj[key]);
+    return acc;
+  }, {} as any);
+};
+
 // API Service Methods
 export const predictionService = {
   // Create prediction
@@ -88,10 +100,13 @@ export const predictionService = {
       const response = await apiClient.get(`/api/applicants?${params.toString()}`);
       const data = response.data?.data || response.data;
       
+      // Transform items from snake_case to camelCase
+      const transformedItems = (data.items || data || []).map((item: any) => toCamelCase(item));
+      
       return {
         success: true,
         data: {
-          items: data.items || data || [],
+          items: transformedItems,
           total: data.total || 0,
           page,
           pageSize,
@@ -110,9 +125,11 @@ export const predictionService = {
   getApplicant: async (id: string | number): Promise<ApiResponse<Applicant>> => {
     try {
       const response = await apiClient.get(`/api/applicants/${id}`);
+      // Transform snake_case from API to camelCase for frontend
+      const rawData = response.data?.data || response.data;
       return {
         success: true,
-        data: response.data,
+        data: toCamelCase(rawData),
       };
     } catch (error) {
       return {

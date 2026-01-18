@@ -92,11 +92,38 @@ const getCreditScoreLabel = (score: number) => {
 };
 
 export default function CreditHistory({ creditProfile }: CreditHistoryProps) {
-    const scoreColor = getCreditScoreColor(creditProfile.currentScore);
-    const scoreLabel = getCreditScoreLabel(creditProfile.currentScore);
+    // Add null safety check
+    if (!creditProfile) {
+        return (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                    No Credit History Available
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                    Credit information will appear here once available.
+                </Typography>
+            </Box>
+        );
+    }
+
+    // Safe defaults for all properties
+    const safeProfile = {
+        currentScore: creditProfile.currentScore ?? 0,
+        scoreHistory: creditProfile.scoreHistory ?? [],
+        creditUtilization: creditProfile.creditUtilization ?? 0,
+        totalCreditLines: creditProfile.totalCreditLines ?? 0,
+        oldestAccount: creditProfile.oldestAccount ?? '',
+        recentInquiries: creditProfile.recentInquiries ?? 0,
+        delinquencies: creditProfile.delinquencies ?? 0,
+        publicRecords: creditProfile.publicRecords ?? 0,
+        averageAccountAge: creditProfile.averageAccountAge ?? 0,
+    };
+
+    const scoreColor = getCreditScoreColor(safeProfile.currentScore);
+    const scoreLabel = getCreditScoreLabel(safeProfile.currentScore);
 
     // Prepare chart data
-    const chartData = creditProfile.scoreHistory
+    const chartData = safeProfile.scoreHistory
         .slice()
         .reverse()
         .map((entry) => ({
@@ -106,8 +133,8 @@ export default function CreditHistory({ creditProfile }: CreditHistoryProps) {
         }));
 
     // Calculate trend
-    const latestScore = creditProfile.scoreHistory[0]?.creditScore || 0;
-    const previousScore = creditProfile.scoreHistory[1]?.creditScore || latestScore;
+    const latestScore = safeProfile.scoreHistory[0]?.creditScore || 0;
+    const previousScore = safeProfile.scoreHistory[1]?.creditScore || latestScore;
     const scoreTrend = latestScore - previousScore;
 
     return (
@@ -122,7 +149,7 @@ export default function CreditHistory({ creditProfile }: CreditHistoryProps) {
                                     Current Credit Score
                                 </Typography>
                                 <Typography variant="h2" fontWeight={700} color={scoreColor} sx={{ my: 1 }}>
-                                    {creditProfile.currentScore}
+                                    {safeProfile.currentScore}
                                 </Typography>
                                 <Chip
                                     label={scoreLabel}
@@ -158,7 +185,7 @@ export default function CreditHistory({ creditProfile }: CreditHistoryProps) {
                         <Grid item xs={6} sm={6}>
                             <InfoCard
                                 title="Credit Utilization"
-                                value={`${(creditProfile.creditUtilization * 100).toFixed(1)}%`}
+                                value={`${((safeProfile.creditUtilization || 0) * 100).toFixed(1)}%`}
                                 icon={<CreditScore />}
                                 color="#1976d2"
                             />
@@ -166,7 +193,7 @@ export default function CreditHistory({ creditProfile }: CreditHistoryProps) {
                         <Grid item xs={6} sm={6}>
                             <InfoCard
                                 title="Total Credit Lines"
-                                value={creditProfile.totalCreditLines}
+                                value={safeProfile.totalCreditLines}
                                 icon={<AccountBalance />}
                                 color="#9c27b0"
                             />
@@ -174,7 +201,7 @@ export default function CreditHistory({ creditProfile }: CreditHistoryProps) {
                         <Grid item xs={6} sm={6}>
                             <InfoCard
                                 title="Account Age"
-                                value={`${creditProfile.averageAccountAge} yrs`}
+                                value={`${safeProfile.averageAccountAge} yrs`}
                                 icon={<CalendarToday />}
                                 color="#f59e0b"
                                 subtitle="Average"
@@ -183,9 +210,9 @@ export default function CreditHistory({ creditProfile }: CreditHistoryProps) {
                         <Grid item xs={6} sm={6}>
                             <InfoCard
                                 title="Recent Inquiries"
-                                value={creditProfile.recentInquiries}
+                                value={safeProfile.recentInquiries}
                                 icon={<Assessment />}
-                                color={creditProfile.recentInquiries > 3 ? '#d32f2f' : '#2e7d32'}
+                                color={safeProfile.recentInquiries > 3 ? '#d32f2f' : '#2e7d32'}
                             />
                         </Grid>
                     </Grid>
@@ -256,7 +283,7 @@ export default function CreditHistory({ creditProfile }: CreditHistoryProps) {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {creditProfile.scoreHistory.map((entry) => (
+                            {safeProfile.scoreHistory.map((entry) => (
                                 <TableRow key={entry.id} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
                                     <TableCell>
                                         <Typography variant="body2">

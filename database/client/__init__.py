@@ -132,10 +132,11 @@ class SupabaseClient:
         self,
         user_id: str,
         status: Optional[str] = None,
+        search: Optional[str] = None,
         page: int = 1,
         page_size: int = 10
     ) -> Dict[str, Any]:
-        """Get paginated applicants list"""
+        """Get paginated applicants list with optional search"""
         try:
             query = self.client.table("applicants").select(
                 "*", count="exact"
@@ -144,6 +145,18 @@ class SupabaseClient:
             # Filter by status if provided
             if status:
                 query = query.eq("status", status)
+            
+            # Search by name, email, or NIC if provided
+            if search and search.strip():
+                search_term = search.strip()
+                # Use or_ filter for multiple columns
+                # Supabase allows ilike for case-insensitive search
+                query = query.or_(
+                    f"name.ilike.%{search_term}%,"
+                    f"email.ilike.%{search_term}%,"
+                    f"nic.ilike.%{search_term}%,"
+                    f"phone.ilike.%{search_term}%"
+                )
             
             # Apply pagination
             start = (page - 1) * page_size

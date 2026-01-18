@@ -38,17 +38,23 @@ class ApplicantBase(BaseModel):
     marital_status: str = Field(..., description="Marital status")
     address: Optional[str] = Field(None, description="Full address")
     city: Optional[str] = Field(None, description="City")
+    district: Optional[str] = Field(None, description="District")
+    postal_code: Optional[str] = Field(None, description="Postal code")
     
     # Employment details
     employment_type: str = Field(..., description="Employment type")
     employer_name: Optional[str] = Field(None, description="Employer name")
+    job_title: Optional[str] = Field(None, description="Job title")
     employment_length: int = Field(..., ge=0, description="Years of employment")
-    monthly_income: float = Field(..., gt=0, description="Monthly income")
+    monthly_income: float = Field(..., ge=0, description="Monthly income")
+    annual_income: Optional[float] = Field(None, ge=0, description="Annual income")
+    account_number: Optional[str] = Field(None, description="Bank account number")
+    dependents: Optional[int] = Field(0, ge=0, description="Number of dependents")
     
-    # Loan details
-    loan_amount: float = Field(..., gt=0, description="Requested loan amount")
-    loan_purpose: str = Field(..., description="Purpose of loan")
-    loan_term_months: int = Field(..., ge=6, le=360, description="Loan term in months")
+    # Loan details - optional when creating applicant without loan request
+    loan_amount: float = Field(0, ge=0, description="Requested loan amount")
+    loan_purpose: str = Field("other", description="Purpose of loan")
+    loan_term_months: int = Field(12, ge=1, le=360, description="Loan term in months")
     
     # Financial details
     credit_score: Optional[int] = Field(None, ge=300, le=850, description="Credit score")
@@ -71,13 +77,19 @@ class ApplicantUpdate(BaseModel):
     marital_status: Optional[str] = None
     address: Optional[str] = None
     city: Optional[str] = None
+    district: Optional[str] = None
+    postal_code: Optional[str] = None
     employment_type: Optional[str] = None
     employer_name: Optional[str] = None
+    job_title: Optional[str] = None
     employment_length: Optional[int] = Field(None, ge=0)
-    monthly_income: Optional[float] = Field(None, gt=0)
-    loan_amount: Optional[float] = Field(None, gt=0)
+    monthly_income: Optional[float] = Field(None, ge=0)
+    annual_income: Optional[float] = Field(None, ge=0)
+    account_number: Optional[str] = None
+    dependents: Optional[int] = Field(None, ge=0)
+    loan_amount: Optional[float] = Field(None, ge=0)
     loan_purpose: Optional[str] = None
-    loan_term_months: Optional[int] = Field(None, ge=6, le=360)
+    loan_term_months: Optional[int] = Field(None, ge=1, le=360)
     credit_score: Optional[int] = Field(None, ge=300, le=850)
     existing_loans: Optional[int] = Field(None, ge=0)
     monthly_expenses: Optional[float] = Field(None, ge=0)
@@ -120,10 +132,16 @@ class ApplicantResponse(BaseModel):
     marital_status: str
     address: Optional[str] = None
     city: Optional[str] = None
+    district: Optional[str] = None
+    postal_code: Optional[str] = None
     employment_type: str
     employer_name: Optional[str] = None
+    job_title: Optional[str] = None
     employment_length: int
     monthly_income: float
+    annual_income: Optional[float] = None
+    account_number: Optional[str] = None
+    dependents: Optional[int] = None
     loan_amount: float
     loan_purpose: str
     loan_term_months: int
@@ -170,6 +188,7 @@ async def list_applicants(
         result = db.get_applicants(
             user_id=user["user_id"],
             status=status_filter,
+            search=search,
             page=page,
             page_size=page_size
         )
@@ -238,10 +257,55 @@ async def get_applicant(
         # Get related data
         prediction = db.get_prediction_by_applicant(applicant_id)
         
-        # Build full response
+        # Parse name into first_name and last_name
+        full_name = applicant.get("name", "")
+        name_parts = full_name.split(" ", 1) if full_name else ["", ""]
+        first_name = name_parts[0] if len(name_parts) > 0 else ""
+        last_name = name_parts[1] if len(name_parts) > 1 else ""
+        
+        # Map database fields to frontend expected format
         response_data = {
-            **applicant,
-            "full_name": f"{applicant.get('first_name', '')} {applicant.get('last_name', '')}".strip() or applicant.get("name", ""),
+            "id": applicant.get("id"),
+            "first_name": first_name,
+            "last_name": last_name,
+            "name": full_name,
+            "email": applicant.get("email"),
+            "phone": applicant.get("phone"),
+            "date_of_birth": applicant.get("date_of_birth"),
+            "gender": applicant.get("gender"),
+            "marital_status": applicant.get("marital_status"),
+            "nic": applicant.get("nic"),
+            
+            # Employment - map from database columns
+            "employment_type": applicant.get("employment_status"),
+            "job_title": applicant.get("occupation"),
+            "employer_name": applicant.get("employer_name"),
+            "employment_length": applicant.get("years_employed"),
+            "monthly_income": applicant.get("monthly_income"),
+            
+            # Financial
+            "credit_score": applicant.get("credit_score"),
+            "existing_loans": applicant.get("existing_loans_count"),
+            
+            # Loan
+            "loan_amount": applicant.get("loan_amount"),
+            "loan_purpose": applicant.get("loan_purpose"),
+            "loan_term_months": applicant.get("loan_term_months"),
+            
+            # Address
+            "address": applicant.get("address_line1"),
+            "city": applicant.get("city"),
+            "district": applicant.get("state"),  # state -> district
+            "postal_code": applicant.get("postal_code"),
+            
+            # Status
+            "status": applicant.get("status"),
+            "eligibility_status": applicant.get("eligibility_status"),
+            "risk_score": applicant.get("risk_score"),
+            
+            # Metadata
+            "created_at": applicant.get("created_at"),
+            "updated_at": applicant.get("updated_at"),
         }
         
         if prediction:
@@ -276,12 +340,54 @@ async def create_applicant(
     Creates applicant with status 'pending'
     """
     try:
-        # Prepare data for database
-        data = applicant_data.dict()
-        data["status"] = "pending"
-        data["created_by"] = user["user_id"]
-        data["created_at"] = datetime.utcnow().isoformat()
-        data["updated_at"] = datetime.utcnow().isoformat()
+        # Prepare data for database - map frontend fields to database columns
+        raw_data = applicant_data.dict()
+        
+        # Build full name from first_name and last_name
+        full_name = f"{raw_data.get('first_name', '')} {raw_data.get('last_name', '')}".strip()
+        
+        # Map to database schema
+        data = {
+            "name": full_name,
+            "email": raw_data.get("email"),
+            "phone": raw_data.get("phone"),
+            "date_of_birth": raw_data.get("date_of_birth"),
+            "gender": raw_data.get("gender"),
+            "marital_status": raw_data.get("marital_status"),
+            "nic": raw_data.get("nic"),
+            
+            # Employment - map to database columns
+            "employment_status": raw_data.get("employment_type"),
+            "occupation": raw_data.get("job_title"),
+            "employer_name": raw_data.get("employer_name"),
+            "years_employed": raw_data.get("employment_length"),
+            "monthly_income": raw_data.get("monthly_income", 0),
+            
+            # Financial
+            "credit_score": raw_data.get("credit_score"),
+            "existing_loans_count": raw_data.get("existing_loans", 0),
+            
+            # Loan
+            "loan_amount": raw_data.get("loan_amount", 0),
+            "loan_purpose": raw_data.get("loan_purpose", "other"),
+            "loan_term_months": raw_data.get("loan_term_months", 12),
+            
+            # Address
+            "address_line1": raw_data.get("address"),
+            "city": raw_data.get("city"),
+            "state": raw_data.get("district"),  # district -> state
+            "postal_code": raw_data.get("postal_code"),
+            "country": "Sri Lanka",
+            
+            # Status and metadata
+            "status": "pending",
+            "created_by": user["user_id"],
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+        
+        # Remove None values to avoid database errors
+        data = {k: v for k, v in data.items() if v is not None}
         
         # Create applicant
         result = db.create_applicant(data)
@@ -298,7 +404,7 @@ async def create_applicant(
             action="CREATE_APPLICANT",
             resource_type="applicant",
             resource_id=result["id"],
-            details={"name": f"{data['first_name']} {data['last_name']}"}
+            details={"name": full_name}
         )
         
         return {
