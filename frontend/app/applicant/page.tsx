@@ -18,6 +18,12 @@ import {
   InputAdornment,
   IconButton,
   Tooltip,
+  Popover,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import {
   Search,
@@ -27,11 +33,16 @@ import {
   Cancel,
   HourglassEmpty,
   RateReview,
+  MoreVert,
+  Send,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
-import { useApplicants } from '@/hooks/useApplicants';
+import { useApplicants, applicantKeys } from '@/hooks/useApplicants';
 import { TableSkeleton } from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/common/EmptyState';
+import predictionService from '@/services/prediction';
+import { useQueryClient } from '@tanstack/react-query';
+import { Applicant, EligibilityResult } from '@/types';
 
 export default function ApplicantListPage() {
   const router = useRouter();
@@ -40,6 +51,82 @@ export default function ApplicantListPage() {
   const [search, setSearch] = useState('');
 
   const { data, isLoading } = useApplicants(page + 1, rowsPerPage, search);
+  const queryClient = useQueryClient();
+
+  // Popover state
+  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
+  const [selectedApplicant, setSelectedApplicant] = useState<any>(null);
+
+  // Snackbar state for feedback
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+
+  const handleOpenMenu = (event: React.MouseEvent<HTMLButtonElement>, applicant: any) => {
+    event.stopPropagation();
+    setAnchorEl(event.currentTarget);
+    setSelectedApplicant(applicant);
+  };
+
+  const handleCloseMenu = () => {
+    setAnchorEl(null);
+    setSelectedApplicant(null);
+  };
+
+  const handleSendToReview = async () => {
+    if (!selectedApplicant) return;
+
+    try {
+      const response = await predictionService.sendForReview(
+        selectedApplicant.id,
+        {
+          applicant_id: selectedApplicant.id,
+          eligible: selectedApplicant.eligibilityStatus === 'eligible',
+          risk_score: selectedApplicant.riskScore || 0,
+          probability: selectedApplicant.riskScore || 0,
+          decision: selectedApplicant.eligibilityStatus === 'eligible' ? 'APPROVE' : 'REJECT',
+          risk_level: 'Unknown',
+          summary_explanation: 'Submitted for review from applicant list',
+          risk_factors: [],
+          protective_factors: [],
+          recommendations: ['Submitted for review from applicant list'],
+          confidence_score: 1.0
+        } as EligibilityResult,
+        'Manually submitted for review'
+      );
+
+      if (response.success) {
+        setSnackbar({
+          open: true,
+          message: 'Applicant successfully sent for review',
+          severity: 'success',
+        });
+        // Invalidate cache to refresh list
+        queryClient.invalidateQueries({ queryKey: applicantKeys.lists() });
+      } else {
+        setSnackbar({
+          open: true,
+          message: response.error || 'Failed to send for review',
+          severity: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error sending for review:', error);
+      setSnackbar({
+        open: true,
+        message: 'An error occurred while sending for review',
+        severity: 'error',
+      });
+    } finally {
+      handleCloseMenu();
+    }
+  };
 
   const handleChangePage = (_: unknown, newPage: number) => {
     setPage(newPage);
@@ -242,18 +329,12 @@ export default function ApplicantListPage() {
                         </Typography>
                       </TableCell>
                       <TableCell align="center">
-                        <Tooltip title="View Details">
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewApplicant(applicant.id);
-                            }}
-                          >
-                            <Visibility />
-                          </IconButton>
-                        </Tooltip>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => handleOpenMenu(e, applicant)}
+                        >
+                          <MoreVert />
+                        </IconButton>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -269,6 +350,68 @@ export default function ApplicantListPage() {
               onPageChange={handleChangePage}
               onRowsPerPageChange={handleChangeRowsPerPage}
             />
+
+            {/* Actions Popover Menu */}
+            <Popover
+              open={Boolean(anchorEl)}
+              anchorEl={anchorEl}
+              onClose={handleCloseMenu}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'right',
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+              PaperProps={{
+                sx: { width: 200, p: 1 }
+              }}
+            >
+              <MenuItem onClick={() => {
+                handleViewApplicant(selectedApplicant?.id);
+                handleCloseMenu();
+              }}>
+                <ListItemIcon>
+                  <Visibility fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="View Details" />
+              </MenuItem>
+
+              <Tooltip
+                title={selectedApplicant?.eligibilityStatus !== 'eligible' ? "Only eligible applicants can be sent for review" : ""}
+                placement="left"
+              >
+                <span>
+                  <MenuItem
+                    disabled={selectedApplicant?.eligibilityStatus !== 'eligible' || selectedApplicant?.status === 'under_review'}
+                    onClick={handleSendToReview}
+                  >
+                    <ListItemIcon>
+                      <Send fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Send to Review" />
+                  </MenuItem>
+                </span>
+              </Tooltip>
+            </Popover>
+
+            {/* Notification Snackbar */}
+            <Snackbar
+              open={snackbar.open}
+              autoHideDuration={6000}
+              onClose={() => setSnackbar({ ...snackbar, open: false })}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+              <Alert
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                severity={snackbar.severity}
+                variant="filled"
+                sx={{ width: '100%', color: '#fff' }}
+              >
+                {snackbar.message}
+              </Alert>
+            </Snackbar>
           </>
         ) : (
           <Box sx={{ p: 4 }}>
