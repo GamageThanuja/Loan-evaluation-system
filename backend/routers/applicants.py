@@ -198,16 +198,22 @@ async def list_applicants(
         for app in result.get("data", []):
             applicants.append({
                 "id": app.get("id"),
-                "name": f"{app.get('first_name', '')} {app.get('last_name', '')}".strip() or app.get("name", ""),
+                "name": app.get("name") or f"{app.get('first_name', '')} {app.get('last_name', '')}".strip(),
                 "email": app.get("email"),
                 "phone": app.get("phone"),
                 "nic": app.get("nic"),
                 "loan_amount": app.get("loan_amount"),
                 "loan_purpose": app.get("loan_purpose"),
+                "loan_term_months": app.get("loan_term_months"),
+                "monthly_income": app.get("monthly_income"),
+                "employment_status": app.get("employment_status"),
+                "employer_name": app.get("employer_name"),
                 "status": app.get("status", "pending"),
                 "eligibility_status": app.get("eligibility_status"),
                 "credit_score": app.get("credit_score"),
+                "rejection_reason": app.get("rejection_reason"),
                 "created_at": app.get("created_at"),
+                "updated_at": app.get("updated_at"),
             })
         
         return {

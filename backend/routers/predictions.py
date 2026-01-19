@@ -86,6 +86,7 @@ class EligibilityPredictionRequest(BaseModel):
     applicant_id: int = Field(..., description="Applicant ID")
     loan_amount: float = Field(..., gt=0, description="Requested loan amount")
     loan_term_months: int = Field(..., ge=6, le=360, description="Loan term in months")
+    monthly_income: Optional[float] = Field(None, description="Monthly income (optional, will use database value if not provided)")
 
 
 class PredictionResponse(BaseModel):
@@ -770,7 +771,7 @@ async def check_eligibility(
             )
         
         # Get applicant income for response
-        monthly_income = applicant.get('monthly_income', 50000)
+        monthly_income = request.monthly_income if request.monthly_income is not None else applicant.get('monthly_income', 50000)
         annual_income = monthly_income * 12
         loan_to_income_ratio = request.loan_amount / annual_income if annual_income > 0 else 999
         monthly_payment = request.loan_amount / request.loan_term_months

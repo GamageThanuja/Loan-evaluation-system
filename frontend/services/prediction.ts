@@ -292,12 +292,13 @@ export const predictionService = {
   // ============================================
 
   // Check eligibility with ML model reasoning
-  checkEligibility: async (applicantId: number, loanAmount: number, loanTermMonths: number): Promise<ApiResponse<EligibilityResult>> => {
+  checkEligibility: async (applicantId: number, loanAmount: number, loanTermMonths: number, monthlyIncome?: number): Promise<ApiResponse<EligibilityResult>> => {
     try {
       const response = await apiClient.post('/api/predictions/eligibility', {
         applicant_id: applicantId,
         loan_amount: loanAmount,
-        loan_term_months: loanTermMonths
+        loan_term_months: loanTermMonths,
+        monthly_income: monthlyIncome
       });
       
       // Get the nested data from API response

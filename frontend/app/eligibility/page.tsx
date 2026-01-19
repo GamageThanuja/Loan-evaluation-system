@@ -72,12 +72,13 @@ export default function EligibilityPage() {
   // Form state
   const [selectedApplicant, setSelectedApplicant] = useState<ApplicantOption | null>(null);
   const [loanAmount, setLoanAmount] = useState<string>('');
+  const [monthlyIncome, setMonthlyIncome] = useState<string>('');
   const [loanDuration, setLoanDuration] = useState<number | ''>('');
   const [evaluationStatus, setEvaluationStatus] = useState<EligibilityStatus>('idle');
   const [processingMessage, setProcessingMessage] = useState(processingMessages[0]);
   const [evaluationResult, setEvaluationResult] = useState<EligibilityResult | null>(null);
   const [sentForReview, setSentForReview] = useState(false);
-  const [errors, setErrors] = useState<{ applicant?: string; amount?: string; duration?: string }>({});
+  const [errors, setErrors] = useState<{ applicant?: string; amount?: string; duration?: string; income?: string }>({});
   const [apiError, setApiError] = useState<string | null>(null);
 
   // Load applicants from API
@@ -123,6 +124,10 @@ export default function EligibilityPage() {
           if (applicant.loanTermMonths && applicant.loanTermMonths > 0) {
             setLoanDuration(applicant.loanTermMonths);
           }
+          // Auto-fill monthly income if available
+          if (applicant.monthlyIncome && applicant.monthlyIncome > 0) {
+            setMonthlyIncome(applicant.monthlyIncome.toString());
+          }
         }
       } catch (error) {
         console.error('Failed to fetch applicant details:', error);
@@ -157,6 +162,9 @@ export default function EligibilityPage() {
     if (!loanDuration) {
       newErrors.duration = 'Please select a loan duration';
     }
+    if (!monthlyIncome || parseFloat(monthlyIncome) <= 0) {
+      newErrors.income = 'Please enter a valid monthly income';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -174,7 +182,8 @@ export default function EligibilityPage() {
       const response = await predictionService.checkEligibility(
         selectedApplicant.id,
         parseFloat(loanAmount),
-        loanDuration as number
+        loanDuration as number,
+        parseFloat(monthlyIncome)
       );
 
       if (response.success && response.data) {
@@ -227,6 +236,7 @@ export default function EligibilityPage() {
   const handleReset = () => {
     setSelectedApplicant(null);
     setLoanAmount('');
+    setMonthlyIncome('');
     setLoanDuration('');
     setEvaluationStatus('idle');
     setEvaluationResult(null);
@@ -304,6 +314,7 @@ export default function EligibilityPage() {
 
     // Update form with suggested values (keep same applicant)
     setLoanAmount(suggestedAmount.toString());
+    setMonthlyIncome(financialProfile?.monthly_income?.toString() || monthlyIncome);
     setLoanDuration(suggestedDuration);
     setEvaluationStatus('idle');
     setEvaluationResult(null);
@@ -391,6 +402,26 @@ export default function EligibilityPage() {
                     }
                   />
                 )}
+              </Grid>
+
+              {/* Monthly Income */}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Monthly Income"
+                  type="number"
+                  value={monthlyIncome}
+                  onChange={(e) => {
+                    setMonthlyIncome(e.target.value);
+                    if (errors.income) setErrors({ ...errors, income: undefined });
+                  }}
+                  error={Boolean(errors.income)}
+                  helperText={errors.income || (monthlyIncome ? formatCurrency(monthlyIncome) : 'Enter the monthly income')}
+                  disabled={evaluationStatus === 'processing'}
+                  InputProps={{
+                    startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>LKR</Typography>,
+                  }}
+                />
               </Grid>
 
               {/* Loan Amount */}
