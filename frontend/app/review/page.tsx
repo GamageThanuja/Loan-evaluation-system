@@ -39,97 +39,38 @@ import {
   Close,
 } from '@mui/icons-material';
 import { useAuth } from '@/hooks/useAuth';
-
-// Mock pending reviews data
-const mockPendingReviews: Review[] = [
-  {
-    id: 'REV001',
-    applicantId: '1',
-    applicantName: 'John Doe',
-    nic: '951234567V',
-    email: 'john@example.com',
-    phone: '+94 77 123 4567',
-    loanAmount: 500000,
-    duration: 24,
-    submittedBy: 'Officer A',
-    submittedAt: '2024-01-15T10:30:00',
-    status: 'pending' as ReviewStatus,
-    monthlyIncome: 150000,
-    employmentType: 'Full-time',
-    employer: 'Tech Corp Ltd',
-    creditScore: 720,
-  },
-  {
-    id: 'REV002',
-    applicantId: '2',
-    applicantName: 'Jane Smith',
-    nic: '901234568V',
-    email: 'jane@example.com',
-    phone: '+94 77 234 5678',
-    loanAmount: 1000000,
-    duration: 36,
-    submittedBy: 'Officer B',
-    submittedAt: '2024-01-14T14:45:00',
-    status: 'pending' as ReviewStatus,
-    monthlyIncome: 250000,
-    employmentType: 'Self-employed',
-    employer: 'Smith Enterprises',
-    creditScore: 680,
-  },
-  {
-    id: 'REV003',
-    applicantId: '3',
-    applicantName: 'Mike Johnson',
-    nic: '881234569V',
-    email: 'mike@example.com',
-    phone: '+94 77 345 6789',
-    loanAmount: 750000,
-    duration: 48,
-    submittedBy: 'Officer A',
-    submittedAt: '2024-01-13T09:15:00',
-    status: 'pending' as ReviewStatus,
-    monthlyIncome: 180000,
-    employmentType: 'Full-time',
-    employer: 'Finance Solutions',
-    creditScore: 750,
-  },
-];
-
-type ReviewStatus = 'pending' | 'approved' | 'rejected';
-
-interface Review {
-  id: string;
-  applicantId: string;
-  applicantName: string;
-  nic: string;
-  email: string;
-  phone: string;
-  loanAmount: number;
-  duration: number;
-  submittedBy: string;
-  submittedAt: string;
-  status: ReviewStatus;
-  monthlyIncome: number;
-  employmentType: string;
-  employer: string;
-  creditScore: number;
-}
+import { useApplicants, useApproveApplication, useRejectApplication, applicantKeys } from '@/hooks/useApplicants';
+import { useQueryClient } from '@tanstack/react-query';
+import { TableSkeleton } from '@/components/ui/LoadingSkeleton';
+import { Applicant } from '@/types';
 
 export default function ReviewPage() {
   const { isManager } = useAuth();
-  const [reviews, setReviews] = useState<Review[]>(mockPendingReviews);
-  const [selectedReview, setSelectedReview] = useState<Review | null>(null);
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState(0);
+
+  // API Hooks
+  const { data: pendingData, isLoading: isLoadingPending } = useApplicants(1, 100, undefined, 'under_review');
+  const { data: approvedData, isLoading: isLoadingApproved } = useApplicants(1, 50, undefined, 'approved');
+  const { data: rejectedData, isLoading: isLoadingRejected } = useApplicants(1, 50, undefined, 'rejected');
+
+  const approveMutation = useApproveApplication();
+  const rejectMutation = useRejectApplication();
+
+  const [selectedReview, setSelectedReview] = useState<Applicant | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; action: 'approve' | 'reject' | null }>({
     open: false,
     action: null,
   });
   const [rejectionReason, setRejectionReason] = useState('');
-  const [activeTab, setActiveTab] = useState(0);
 
-  // Filter reviews by status
-  const pendingReviews = reviews.filter((r) => r.status === 'pending');
-  const processedReviews = reviews.filter((r) => r.status !== 'pending');
+  const pendingReviews = pendingData?.items || [];
+  const processedReviews = [...(approvedData?.items || []), ...(rejectedData?.items || [])].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+
+  const isLoading = isLoadingPending || isLoadingApproved || isLoadingRejected;
 
   // Redirect non-managers
   if (!isManager) {
@@ -160,7 +101,7 @@ export default function ReviewPage() {
     });
   };
 
-  const handleViewDetails = (review: Review) => {
+  const handleViewDetails = (review: Applicant) => {
     setSelectedReview(review);
     setDetailsOpen(true);
   };
@@ -175,68 +116,82 @@ export default function ReviewPage() {
     setConfirmDialog({ open: true, action });
   };
 
-  const handleExecuteAction = () => {
+  const handleExecuteAction = async () => {
     if (!selectedReview || !confirmDialog.action) return;
 
-    const newStatus: ReviewStatus = confirmDialog.action === 'approve' ? 'approved' : 'rejected';
+    const applicantId = selectedReview.id.toString();
 
-    setReviews((prev) =>
-      prev.map((r) =>
-        r.id === selectedReview.id
-          ? { ...r, status: newStatus }
-          : r
-      )
-    );
+    try {
+      if (confirmDialog.action === 'approve') {
+        await approveMutation.mutateAsync({
+          applicantId,
+          data: { notes: 'Approved by manager' }
+        });
+      } else {
+        await rejectMutation.mutateAsync({
+          applicantId,
+          data: { reason: rejectionReason }
+        });
+      }
 
-    setConfirmDialog({ open: false, action: null });
-    handleCloseDetails();
+      // Refresh data
+      queryClient.invalidateQueries({ queryKey: applicantKeys.all });
+
+      setConfirmDialog({ open: false, action: null });
+      handleCloseDetails();
+    } catch (error) {
+      console.error('Error processing review:', error);
+    }
   };
 
-  const getStatusChip = (status: ReviewStatus) => {
-    switch (status) {
+  const getStatusChip = (status: string) => {
+    switch (status?.toLowerCase()) {
       case 'approved':
         return <Chip label="Approved" color="success" size="small" icon={<CheckCircle />} />;
       case 'rejected':
         return <Chip label="Rejected" color="error" size="small" icon={<Cancel />} />;
+      case 'under_review':
+        return <Chip label="Under Review" color="info" size="small" icon={<Schedule />} />;
+      case 'pending':
+        return <Chip label="Pending" color="warning" size="small" icon={<Schedule />} />;
       default:
-        return <Chip label="Pending" color="warning" size="small" />;
+        return <Chip label={status || 'Unknown'} size="small" />;
     }
   };
 
-  const renderReviewTable = (reviewList: Review[]) => (
+  const renderReviewTable = (reviewList: Applicant[]) => (
     <TableContainer>
       <Table>
         <TableHead>
-          <TableRow>
-            <TableCell>Applicant</TableCell>
-            <TableCell>NIC</TableCell>
-            <TableCell align="right">Loan Amount</TableCell>
-            <TableCell align="center">Duration</TableCell>
-            <TableCell>Submitted By</TableCell>
-            <TableCell>Submitted At</TableCell>
-            <TableCell align="center">Status</TableCell>
-            <TableCell align="center">Actions</TableCell>
+          <TableRow sx={{ bgcolor: 'action.hover' }}>
+            <TableCell sx={{ fontWeight: 700 }}>Applicant</TableCell>
+            <TableCell sx={{ fontWeight: 700 }}>NIC</TableCell>
+            <TableCell align="right" sx={{ fontWeight: 700 }}>Loan Amount</TableCell>
+            <TableCell align="center" sx={{ fontWeight: 700 }}>Duration</TableCell>
+            <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+            <TableCell sx={{ fontWeight: 700 }}>Submitted At</TableCell>
+            <TableCell align="center" sx={{ fontWeight: 700 }}>Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {reviewList.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                <Typography color="text.secondary">No reviews found</Typography>
+              <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                <Typography color="text.secondary">No applications currently in this status</Typography>
               </TableCell>
             </TableRow>
           ) : (
             reviewList.map((review) => (
               <TableRow key={review.id} hover>
                 <TableCell>
-                  <Typography fontWeight={600}>{review.applicantName}</Typography>
+                  <Typography fontWeight={600}>{review.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">{review.email}</Typography>
                 </TableCell>
                 <TableCell>{review.nic}</TableCell>
                 <TableCell align="right">{formatCurrency(review.loanAmount)}</TableCell>
-                <TableCell align="center">{review.duration} months</TableCell>
-                <TableCell>{review.submittedBy}</TableCell>
-                <TableCell>{formatDate(review.submittedAt)}</TableCell>
-                <TableCell align="center">{getStatusChip(review.status)}</TableCell>
+                <TableCell align="center">{review.loanTermMonths || review.loanTerm || 12} months</TableCell>
+                <TableCell>{getStatusChip(review.status)}</TableCell>
+                <TableCell>{formatDate(review.createdAt)}</TableCell>
                 <TableCell align="center">
                   <Tooltip title="View Details">
                     <IconButton
@@ -281,7 +236,7 @@ export default function ReviewPage() {
                     Pending Reviews
                   </Typography>
                 </Box>
-                <Schedule sx={{ fontSize: 50, color: 'warning.light' }} />
+                <Schedule sx={{ fontSize: 40, color: 'warning.light' }} />
               </Box>
             </CardContent>
           </Card>
@@ -292,13 +247,13 @@ export default function ReviewPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
                   <Typography variant="h3" fontWeight={700} color="success.main">
-                    {reviews.filter((r) => r.status === 'approved').length}
+                    {approvedData?.total || 0}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Approved
                   </Typography>
                 </Box>
-                <CheckCircle sx={{ fontSize: 50, color: 'success.light' }} />
+                <CheckCircle sx={{ fontSize: 40, color: 'success.light' }} />
               </Box>
             </CardContent>
           </Card>
@@ -309,13 +264,13 @@ export default function ReviewPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
                   <Typography variant="h3" fontWeight={700} color="error.main">
-                    {reviews.filter((r) => r.status === 'rejected').length}
+                    {rejectedData?.total || 0}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Rejected
                   </Typography>
                 </Box>
-                <Cancel sx={{ fontSize: 50, color: 'error.light' }} />
+                <Cancel sx={{ fontSize: 40, color: 'error.light' }} />
               </Box>
             </CardContent>
           </Card>
@@ -333,8 +288,16 @@ export default function ReviewPage() {
           <Tab label={`Processed (${processedReviews.length})`} />
         </Tabs>
 
-        {activeTab === 0 && renderReviewTable(pendingReviews)}
-        {activeTab === 1 && renderReviewTable(processedReviews)}
+        {isLoading ? (
+          <Box sx={{ p: 4 }}>
+            <TableSkeleton rows={5} />
+          </Box>
+        ) : (
+          <>
+            {activeTab === 0 && renderReviewTable(pendingReviews)}
+            {activeTab === 1 && renderReviewTable(processedReviews)}
+          </>
+        )}
       </Paper>
 
       {/* Details Dialog */}
@@ -370,9 +333,9 @@ export default function ReviewPage() {
                     <Divider sx={{ mb: 2 }} />
                     <Grid container spacing={1}>
                       <Grid item xs={5}><Typography variant="body2" color="text.secondary">Name:</Typography></Grid>
-                      <Grid item xs={7}><Typography variant="body2" fontWeight={600}>{selectedReview.applicantName}</Typography></Grid>
+                      <Grid item xs={7}><Typography variant="body2" fontWeight={600}>{selectedReview.name || 'N/A'}</Typography></Grid>
                       <Grid item xs={5}><Typography variant="body2" color="text.secondary">NIC:</Typography></Grid>
-                      <Grid item xs={7}><Typography variant="body2">{selectedReview.nic}</Typography></Grid>
+                      <Grid item xs={7}><Typography variant="body2">{selectedReview.nic || 'N/A'}</Typography></Grid>
                       <Grid item xs={5}><Typography variant="body2" color="text.secondary">Email:</Typography></Grid>
                       <Grid item xs={7}><Typography variant="body2">{selectedReview.email}</Typography></Grid>
                       <Grid item xs={5}><Typography variant="body2" color="text.secondary">Phone:</Typography></Grid>
@@ -397,9 +360,9 @@ export default function ReviewPage() {
                       <Grid item xs={5}><Typography variant="body2" color="text.secondary">Amount:</Typography></Grid>
                       <Grid item xs={7}><Typography variant="body2" fontWeight={600}>{formatCurrency(selectedReview.loanAmount)}</Typography></Grid>
                       <Grid item xs={5}><Typography variant="body2" color="text.secondary">Duration:</Typography></Grid>
-                      <Grid item xs={7}><Typography variant="body2">{selectedReview.duration} months</Typography></Grid>
+                      <Grid item xs={7}><Typography variant="body2">{selectedReview.loanTermMonths || selectedReview.loanTerm || 12} months</Typography></Grid>
                       <Grid item xs={5}><Typography variant="body2" color="text.secondary">Monthly EMI:</Typography></Grid>
-                      <Grid item xs={7}><Typography variant="body2">{formatCurrency(Math.round(selectedReview.loanAmount / selectedReview.duration * 1.12))}</Typography></Grid>
+                      <Grid item xs={7}><Typography variant="body2">{formatCurrency(Math.round(selectedReview.loanAmount / (selectedReview.loanTermMonths || selectedReview.loanTerm || 12) * 1.12))}</Typography></Grid>
                     </Grid>
                   </CardContent>
                 </Card>
@@ -418,18 +381,20 @@ export default function ReviewPage() {
                     <Divider sx={{ mb: 2 }} />
                     <Grid container spacing={1}>
                       <Grid item xs={5}><Typography variant="body2" color="text.secondary">Monthly Income:</Typography></Grid>
-                      <Grid item xs={7}><Typography variant="body2">{formatCurrency(selectedReview.monthlyIncome)}</Typography></Grid>
+                      <Grid item xs={7}><Typography variant="body2">{formatCurrency(selectedReview.monthlyIncome || 0)}</Typography></Grid>
                       <Grid item xs={5}><Typography variant="body2" color="text.secondary">Employment:</Typography></Grid>
-                      <Grid item xs={7}><Typography variant="body2">{selectedReview.employmentType}</Typography></Grid>
+                      <Grid item xs={7}><Typography variant="body2">{selectedReview.employmentStatus || selectedReview.employmentType || 'N/A'}</Typography></Grid>
                       <Grid item xs={5}><Typography variant="body2" color="text.secondary">Employer:</Typography></Grid>
-                      <Grid item xs={7}><Typography variant="body2">{selectedReview.employer}</Typography></Grid>
+                      <Grid item xs={7}><Typography variant="body2">{selectedReview.employerName || 'N/A'}</Typography></Grid>
                       <Grid item xs={5}><Typography variant="body2" color="text.secondary">Credit Score:</Typography></Grid>
                       <Grid item xs={7}>
-                        <Chip
-                          label={selectedReview.creditScore}
-                          size="small"
-                          color={selectedReview.creditScore >= 700 ? 'success' : selectedReview.creditScore >= 600 ? 'warning' : 'error'}
-                        />
+                        {selectedReview.creditScore !== undefined ? (
+                          <Chip
+                            label={selectedReview.creditScore}
+                            size="small"
+                            color={selectedReview.creditScore >= 700 ? 'success' : selectedReview.creditScore >= 600 ? 'warning' : 'error'}
+                          />
+                        ) : 'N/A'}
                       </Grid>
                     </Grid>
                   </CardContent>
@@ -443,16 +408,23 @@ export default function ReviewPage() {
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                       <Schedule sx={{ mr: 1, color: 'primary.main' }} />
                       <Typography variant="subtitle1" fontWeight={600}>
-                        Submission Details
+                        Review Details
                       </Typography>
                     </Box>
                     <Divider sx={{ mb: 2 }} />
                     <Grid container spacing={1}>
-                      <Grid item xs={5}><Typography variant="body2" color="text.secondary">Submitted By:</Typography></Grid>
-                      <Grid item xs={7}><Typography variant="body2">{selectedReview.submittedBy}</Typography></Grid>
                       <Grid item xs={5}><Typography variant="body2" color="text.secondary">Submitted At:</Typography></Grid>
-                      <Grid item xs={7}><Typography variant="body2">{formatDate(selectedReview.submittedAt)}</Typography></Grid>
-                      <Grid item xs={5}><Typography variant="body2" color="text.secondary">Status:</Typography></Grid>
+                      <Grid item xs={7}><Typography variant="body2">{formatDate(selectedReview.createdAt)}</Typography></Grid>
+                      <Grid item xs={5}><Typography variant="body2" color="text.secondary">Eligibility:</Typography></Grid>
+                      <Grid item xs={7}>
+                        <Chip
+                          label={selectedReview.eligibilityStatus || 'Not Checked'}
+                          size="small"
+                          color={selectedReview.eligibilityStatus === 'eligible' ? 'success' : 'default'}
+                          variant="outlined"
+                        />
+                      </Grid>
+                      <Grid item xs={5}><Typography variant="body2" color="text.secondary">Current Status:</Typography></Grid>
                       <Grid item xs={7}>{getStatusChip(selectedReview.status)}</Grid>
                     </Grid>
                   </CardContent>
@@ -460,24 +432,31 @@ export default function ReviewPage() {
               </Grid>
 
               {/* Rejection Reason (only for reject action) */}
-              {selectedReview.status === 'pending' && (
+              {selectedReview.status === 'under_review' && (
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
                     multiline
                     rows={3}
-                    label="Rejection Reason (required if rejecting)"
+                    label="Decision Notes / Rejection Reason"
                     value={rejectionReason}
                     onChange={(e) => setRejectionReason(e.target.value)}
-                    placeholder="Enter the reason for rejection..."
+                    placeholder="Enter approval comments or rejection reason..."
                   />
+                </Grid>
+              )}
+              {selectedReview.status === 'rejected' && (
+                <Grid item xs={12}>
+                  <Alert severity="error" icon={<Cancel />}>
+                    <strong>Rejection Reason:</strong> {selectedReview.rejectionReason || 'No reason specified'}
+                  </Alert>
                 </Grid>
               )}
             </Grid>
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2, gap: 1 }}>
-          {selectedReview?.status === 'pending' && (
+          {selectedReview?.status === 'under_review' && (
             <>
               <Button
                 variant="contained"
@@ -517,12 +496,12 @@ export default function ReviewPage() {
         <DialogContent>
           <Typography>
             Are you sure you want to {confirmDialog.action} the loan application for{' '}
-            <strong>{selectedReview?.applicantName}</strong>?
+            <strong>{selectedReview?.name}</strong>?
           </Typography>
           {confirmDialog.action === 'approve' && (
             <Alert severity="info" sx={{ mt: 2 }}>
               This will approve a loan of {selectedReview && formatCurrency(selectedReview.loanAmount)} for{' '}
-              {selectedReview?.duration} months.
+              {selectedReview?.loanTermMonths || selectedReview?.loanTerm || 12} months.
             </Alert>
           )}
           {confirmDialog.action === 'reject' && (

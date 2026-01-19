@@ -662,10 +662,7 @@ async def send_for_review(
         # Update status to under_review
         result = db.update_applicant(applicant_id, {
             "status": "under_review",
-            "sent_for_review_by": user["user_id"],
-            "sent_for_review_at": datetime.utcnow().isoformat(),
-            "eligibility_result": request.eligibility_result,
-            "review_notes": request.notes,
+            "notes": request.notes,
             "updated_at": datetime.utcnow().isoformat()
         })
         
