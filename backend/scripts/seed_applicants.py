@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any
 import random
 from decimal import Decimal
+import re
 
 # Add parent directories to path
 backend_dir = Path(__file__).parent.parent
@@ -69,12 +70,56 @@ def random_phone() -> str:
     """Generate random Sri Lankan phone number"""
     return f"+94{random.randint(700000000, 799999999)}"
 
-def random_nic() -> str:
-    """Generate random NIC number"""
-    year = random.randint(70, 99)
-    days = random.randint(1, 366)
+NIC_PATTERN = re.compile(r"^\d{9}[VX]$")
+
+def normalize_gender(gender: str) -> str:
+    """Normalize gender values to M/F"""
+    if not gender:
+        return "M"
+    value = str(gender).strip().lower()
+    if value.startswith("f"):
+        return "F"
+    if value.startswith("m"):
+        return "M"
+    return "M"
+
+def is_valid_nic(nic: str) -> bool:
+    """Check NIC format (old Sri Lankan NIC format)"""
+    if not nic:
+        return False
+    return bool(NIC_PATTERN.match(str(nic).strip().upper()))
+
+def generate_nic_from_dob(dob: str, gender: str) -> str:
+    """Generate Sri Lankan NIC from date of birth and gender (YYDDDXXXXV)"""
+    birth_date = None
+    if dob:
+        try:
+            birth_date = datetime.fromisoformat(str(dob).replace("Z", "+00:00"))
+        except Exception:
+            try:
+                birth_date = datetime.strptime(str(dob), "%Y-%m-%d")
+            except Exception:
+                birth_date = None
+    
+    if not birth_date:
+        year = random.randint(70, 99)
+        days = random.randint(1, 366)
+        suffix = random.randint(1000, 9999)
+        return f"{year:02d}{days:03d}{suffix:04d}V"
+    
+    year = birth_date.year % 100
+    day_of_year = birth_date.timetuple().tm_yday
+    if normalize_gender(gender) == "F":
+        day_of_year += 500
     suffix = random.randint(1000, 9999)
-    return f"{year}{days:03d}{suffix}V"
+    return f"{year:02d}{day_of_year:03d}{suffix:04d}V"
+
+def normalize_nic_value(nic: str) -> str:
+    """Normalize NIC to uppercase format or return empty string"""
+    if not nic:
+        return ""
+    normalized = str(nic).strip().upper()
+    return normalized if is_valid_nic(normalized) else ""
 
 def random_email(first_name: str, last_name: str) -> str:
     """Generate email address"""
@@ -100,11 +145,13 @@ def generate_base_applicant(gender: str = None) -> Dict[str, Any]:
     last_name = random.choice(LAST_NAMES)
     
     dob = random_date(365 * 60, 365 * 25)  # 25-60 years old
+    nic = generate_nic_from_dob(dob, gender)
     
     return {
         "name": f"{first_name} {last_name}",
         "email": random_email(first_name, last_name),
         "phone": random_phone(),
+        "nic": nic,
         "date_of_birth": dob,
         "gender": gender,
         "marital_status": random.choice(["Single", "Married", "Divorced", "Widowed"]),
@@ -327,11 +374,28 @@ def generate_credit_accounts(profile_type: str, applicant_id: str, credit_score:
     
     return accounts
 
+def determine_profile_type(credit_score: int) -> str:
+    """Determine applicant profile type from credit score"""
+    if credit_score >= 800:
+        return "excellent"
+    if credit_score >= 740:
+        return "very_good"
+    if credit_score >= 670:
+        return "good"
+    if credit_score >= 580:
+        return "fair"
+    return "poor"
+
 # ============================================
 # REPAYMENT HISTORY GENERATORS
 # ============================================
 
-def generate_loan_history(profile_type: str, applicant_id: str) -> List[Dict[str, Any]]:
+def generate_loan_history(
+    profile_type: str,
+    applicant_id: str,
+    primary_loan_amount: float = None,
+    primary_term_months: int = None
+) -> List[Dict[str, Any]]:
     """Generate loan repayment history based on profile type"""
     num_loans = random.randint(1, 3)
     loans = []
@@ -348,7 +412,10 @@ def generate_loan_history(profile_type: str, applicant_id: str) -> List[Dict[str
             else:
                 loan_status = random.choices(["active", "defaulted"], weights=[0.8, 0.2])[0]
         
-        original_amount = round(random.uniform(300000, 5000000), 2)
+        if primary_loan_amount and i == num_loans - 1:
+            original_amount = float(primary_loan_amount)
+        else:
+            original_amount = round(random.uniform(300000, 5000000), 2)
         start_date = random_date(365 * 10, 365 * (i + 1))
         
         if loan_status in ["closed", "paid_off"]:
@@ -365,7 +432,10 @@ def generate_loan_history(profile_type: str, applicant_id: str) -> List[Dict[str
             next_due_date = random_date(0, -30)  # Future date
         
         # Calculate term and monthly payment
-        term_months = random.choice([12, 24, 36, 48, 60, 84, 120])
+        if primary_term_months and i == num_loans - 1:
+            term_months = int(primary_term_months)
+        else:
+            term_months = random.choice([12, 24, 36, 48, 60, 84, 120])
         monthly_payment = round(original_amount / term_months * 1.1, 2)  # Simplified with interest
         
         # Payment performance based on profile
@@ -391,6 +461,18 @@ def generate_loan_history(profile_type: str, applicant_id: str) -> List[Dict[str
             on_time = int(total_payments * on_time_pct / 100)
             late = total_payments - on_time
             avg_days_late = random.uniform(15, 45)
+
+        if loan_status in ["closed", "paid_off"]:
+            payment_status = "closed"
+        elif loan_status == "defaulted":
+            payment_status = "defaulted"
+        else:
+            if on_time_pct >= 90:
+                payment_status = "current"
+            elif on_time_pct >= 75:
+                payment_status = "late"
+            else:
+                payment_status = "delinquent"
         
         # Generate recent payments (last 6 months)
         recent_payments = []
@@ -415,6 +497,7 @@ def generate_loan_history(profile_type: str, applicant_id: str) -> List[Dict[str
             "remaining_balance": remaining_balance,
             "monthly_payment": monthly_payment,
             "interest_rate": round(random.uniform(6.5, 18.5), 2),
+            "payment_status": payment_status,
             "start_date": start_date,
             "end_date": end_date,
             "maturity_date": (datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=30 * term_months)).strftime("%Y-%m-%d"),
@@ -434,6 +517,267 @@ def generate_loan_history(profile_type: str, applicant_id: str) -> List[Dict[str
         loans.append(loan)
     
     return loans
+
+# ============================================
+# TRANSACTION HISTORY GENERATORS
+# ============================================
+
+PAYMENT_METHODS = ["bank_transfer", "card", "cash", "online"]
+
+def format_transaction_date(date_value: str, hour: int = 10) -> str:
+    """Convert date string to ISO timestamp for transactions"""
+    try:
+        parsed = datetime.fromisoformat(str(date_value).replace("Z", ""))
+    except Exception:
+        try:
+            parsed = datetime.strptime(str(date_value), "%Y-%m-%d")
+        except Exception:
+            parsed = datetime.utcnow()
+    parsed = parsed.replace(
+        hour=hour,
+        minute=random.randint(0, 59),
+        second=random.randint(0, 59),
+        microsecond=0
+    )
+    return parsed.isoformat()
+
+def generate_transactions_for_loans(applicant_id: int, loans: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Generate transaction history aligned to repayment history"""
+    transactions = []
+    
+    for loan in loans:
+        loan_id = loan.get("loan_id") or f"LOAN{random.randint(1000, 9999)}"
+        original_amount = float(loan.get("original_amount", 0))
+        start_date = loan.get("start_date") or datetime.utcnow().strftime("%Y-%m-%d")
+        monthly_payment = float(loan.get("monthly_payment") or 0)
+        
+        if monthly_payment <= 0 and original_amount > 0:
+            monthly_payment = round(original_amount / random.choice([12, 24, 36, 48, 60]), 2)
+        
+        balance = original_amount
+        
+        # Disbursement
+        transactions.append({
+            "applicant_id": applicant_id,
+            "loan_id": loan_id,
+            "transaction_date": format_transaction_date(start_date, hour=9),
+            "transaction_type": "disbursement",
+            "amount": original_amount,
+            "description": "Loan disbursement",
+            "status": "completed",
+            "payment_method": "bank_transfer",
+            "reference_number": f"DISB-{loan_id}",
+            "balance": balance,
+            "notes": None
+        })
+        
+        # Origination fee
+        fee_amount = round(original_amount * random.uniform(0.005, 0.02), 2)
+        if fee_amount > 0:
+            balance += fee_amount
+            transactions.append({
+                "applicant_id": applicant_id,
+                "loan_id": loan_id,
+                "transaction_date": format_transaction_date(start_date, hour=11),
+                "transaction_type": "fee",
+                "amount": fee_amount,
+                "description": "Loan origination fee",
+                "status": "completed",
+                "payment_method": "bank_transfer",
+                "reference_number": f"FEE-{loan_id}",
+                "balance": balance,
+                "notes": None
+            })
+        
+        # Payments
+        recent_payments = loan.get("recent_payments", [])
+        if not recent_payments:
+            recent_payments = []
+            for month in range(6):
+                payment_date = (datetime.now() - timedelta(days=30 * month)).strftime("%Y-%m-%d")
+                recent_payments.append({
+                    "date": payment_date,
+                    "amount": monthly_payment,
+                    "status": "paid",
+                    "days_late": 0
+                })
+        
+        for idx, payment in enumerate(recent_payments):
+            payment_amount = float(payment.get("amount", monthly_payment))
+            payment_status = payment.get("status", "paid")
+            transaction_status = "completed" if payment_status == "paid" else "pending"
+            if transaction_status == "completed":
+                balance = max(balance - payment_amount, 0)
+            
+            transactions.append({
+                "applicant_id": applicant_id,
+                "loan_id": loan_id,
+                "transaction_date": format_transaction_date(payment.get("date"), hour=10),
+                "transaction_type": "payment",
+                "amount": payment_amount,
+                "description": "Loan repayment",
+                "status": transaction_status,
+                "payment_method": random.choice(PAYMENT_METHODS),
+                "reference_number": f"PAY-{loan_id}-{idx + 1}",
+                "balance": balance,
+                "notes": "Late payment" if payment.get("days_late", 0) > 0 else None
+            })
+            
+            if payment.get("days_late", 0) > 0:
+                penalty_amount = round(payment_amount * random.uniform(0.01, 0.03), 2)
+                balance += penalty_amount
+                transactions.append({
+                    "applicant_id": applicant_id,
+                    "loan_id": loan_id,
+                    "transaction_date": format_transaction_date(payment.get("date"), hour=15),
+                    "transaction_type": "penalty",
+                    "amount": penalty_amount,
+                    "description": "Late payment penalty",
+                    "status": "completed",
+                    "payment_method": "bank_transfer",
+                    "reference_number": f"PEN-{loan_id}-{idx + 1}",
+                    "balance": balance,
+                    "notes": f"Late by {payment.get('days_late', 0)} days"
+                })
+    
+    return transactions
+
+# ============================================
+# AUDIT LOG GENERATORS
+# ============================================
+
+def generate_audit_logs_for_applicant(
+    applicant: Dict[str, Any],
+    loans: List[Dict[str, Any]],
+    transactions: List[Dict[str, Any]],
+    default_user_id: str
+) -> List[Dict[str, Any]]:
+    """Generate audit logs aligned with loan and transaction history"""
+    applicant_id = applicant.get("id")
+    created_by = applicant.get("created_by") or default_user_id
+    logs = []
+    
+    # Creation log
+    logs.append({
+        "user_id": created_by,
+        "action": "created",
+        "resource_type": "applicant",
+        "resource_id": str(applicant_id),
+        "details": {
+            "description": "Loan application created",
+            "performed_by": {
+                "id": created_by,
+                "name": "Loan Officer",
+                "role": "loan_officer"
+            }
+        },
+        "created_at": applicant.get("created_at", datetime.utcnow().isoformat())
+    })
+    
+    # Eligibility review log
+    if applicant.get("eligibility_status"):
+        logs.append({
+            "user_id": created_by,
+            "action": "reviewed",
+            "resource_type": "applicant",
+            "resource_id": str(applicant_id),
+            "details": {
+                "description": f"Eligibility check completed - {applicant.get('eligibility_status')}",
+                "performed_by": {
+                    "id": "system",
+                    "name": "System",
+                    "role": "system"
+                }
+            },
+            "created_at": applicant.get("updated_at", datetime.utcnow().isoformat())
+        })
+    
+    # Status change log
+    status = applicant.get("status", "pending")
+    if status == "under_review":
+        logs.append({
+            "user_id": created_by,
+            "action": "status_changed",
+            "resource_type": "applicant",
+            "resource_id": str(applicant_id),
+            "details": {
+                "description": "Application sent for manager review",
+                "performed_by": {
+                    "id": created_by,
+                    "name": "Loan Officer",
+                    "role": "loan_officer"
+                },
+                "changes": [
+                    {"field": "status", "old_value": "pending", "new_value": "under_review"}
+                ]
+            },
+            "created_at": applicant.get("updated_at", datetime.utcnow().isoformat())
+        })
+    elif status == "approved":
+        approved_by = applicant.get("approved_by") or default_user_id
+        logs.append({
+            "user_id": approved_by,
+            "action": "approved",
+            "resource_type": "applicant",
+            "resource_id": str(applicant_id),
+            "details": {
+                "description": "Loan application approved",
+                "performed_by": {
+                    "id": approved_by,
+                    "name": "Bank Manager",
+                    "role": "manager"
+                },
+                "metadata": {"amount": applicant.get("loan_amount")}
+            },
+            "created_at": applicant.get("approved_at", applicant.get("updated_at", datetime.utcnow().isoformat()))
+        })
+    elif status == "rejected":
+        rejected_by = applicant.get("rejected_by") or default_user_id
+        logs.append({
+            "user_id": rejected_by,
+            "action": "rejected",
+            "resource_type": "applicant",
+            "resource_id": str(applicant_id),
+            "details": {
+                "description": f"Loan application rejected: {applicant.get('rejection_reason', 'Not specified')}",
+                "performed_by": {
+                    "id": rejected_by,
+                    "name": "Bank Manager",
+                    "role": "manager"
+                }
+            },
+            "created_at": applicant.get("rejected_at", applicant.get("updated_at", datetime.utcnow().isoformat()))
+        })
+    
+    # Payment logs
+    payment_transactions = [
+        tx for tx in transactions
+        if tx.get("transaction_type") == "payment" and tx.get("status") == "completed"
+    ]
+    payment_transactions.sort(key=lambda t: t.get("transaction_date", ""), reverse=True)
+    
+    for payment in payment_transactions[:2]:
+        logs.append({
+            "user_id": created_by,
+            "action": "payment_made",
+            "resource_type": "applicant",
+            "resource_id": str(applicant_id),
+            "details": {
+                "description": f"Payment received of LKR {payment.get('amount')}",
+                "performed_by": {
+                    "id": created_by,
+                    "name": "System",
+                    "role": "system"
+                },
+                "metadata": {
+                    "reference_number": payment.get("reference_number"),
+                    "loan_id": payment.get("loan_id")
+                }
+            },
+            "created_at": payment.get("transaction_date", datetime.utcnow().isoformat())
+        })
+    
+    return logs
 
 # ============================================
 # MAIN SEEDING FUNCTION
@@ -479,6 +823,8 @@ def seed_applicants():
     all_applicants = []
     all_credit_history = []
     all_repayment_history = []
+    all_transactions = []
+    all_audit_logs = []
     
     # Generate applicants by profile type
     profile_generators = [
@@ -538,8 +884,21 @@ def seed_applicants():
         all_credit_history.extend(credit_accounts)
         
         # Generate loan history
-        loans = generate_loan_history(profile_type, applicant_id)
+        loans = generate_loan_history(
+            profile_type,
+            applicant_id,
+            primary_loan_amount=applicant_data.get("loan_amount"),
+            primary_term_months=applicant_data.get("loan_term_months")
+        )
         all_repayment_history.extend(loans)
+        
+        # Generate transactions aligned to loans
+        transactions = generate_transactions_for_loans(applicant_id, loans)
+        all_transactions.extend(transactions)
+        
+        # Generate audit logs aligned to transactions
+        audit_logs = generate_audit_logs_for_applicant(applicant_data, loans, transactions, created_by)
+        all_audit_logs.extend(audit_logs)
         
         if (i + 1) % 10 == 0:
             print(f"  Processed {i + 1}/{len(inserted_applicants)} applicants...")
@@ -547,6 +906,8 @@ def seed_applicants():
     print()
     print(f"✅ Generated {len(all_credit_history)} credit accounts")
     print(f"✅ Generated {len(all_repayment_history)} loan records")
+    print(f"✅ Generated {len(all_transactions)} transactions")
+    print(f"✅ Generated {len(all_audit_logs)} audit logs")
     print()
     
     # Insert credit history
@@ -566,6 +927,26 @@ def seed_applicants():
         print(f"✅ Inserted {len(all_repayment_history)} repayment history records")
     except Exception as e:
         print(f"❌ Error inserting repayment history: {e}")
+
+    print()
+    
+    # Insert transactions
+    print("💾 Inserting transactions...")
+    try:
+        db.bulk_create_transactions(all_transactions)
+        print(f"✅ Inserted {len(all_transactions)} transactions")
+    except Exception as e:
+        print(f"❌ Error inserting transactions: {e}")
+    
+    print()
+    
+    # Insert audit logs
+    print("💾 Inserting audit logs...")
+    try:
+        db.bulk_create_audit_logs(all_audit_logs)
+        print(f"✅ Inserted {len(all_audit_logs)} audit logs")
+    except Exception as e:
+        print(f"❌ Error inserting audit logs: {e}")
     
     print()
     print("=" * 80)
@@ -584,9 +965,152 @@ def seed_applicants():
     print()
     print(f"  Total Credit Accounts: {len(all_credit_history)}")
     print(f"  Total Loan Records: {len(all_repayment_history)}")
+    print(f"  Total Transactions: {len(all_transactions)}")
+    print(f"  Total Audit Logs: {len(all_audit_logs)}")
     print()
     print("✅ All applicants now have complete financial profiles!")
     print()
 
+def seed_existing_applicants():
+    """Seed missing histories and NICs for existing applicants"""
+    print("=" * 80)
+    print("LOAN EVALUATION SYSTEM - BACKFILL EXISTING APPLICANTS")
+    print("=" * 80)
+    print()
+    
+    # Get a default user ID for audit logs
+    try:
+        users_response = db.client.table("users").select("id").limit(1).execute()
+        if users_response.data:
+            default_user_id = users_response.data[0]["id"]
+        else:
+            print("❌ No users found in database. Please create at least one user first.")
+            return
+    except Exception as e:
+        print(f"❌ Error getting user: {e}")
+        return
+    
+    # Fetch all applicants with pagination
+    applicants = []
+    start = 0
+    batch_size = 200
+    
+    while True:
+        response = (
+            db.client.table("applicants")
+            .select("*")
+            .range(start, start + batch_size - 1)
+            .execute()
+        )
+        batch = response.data or []
+        if not batch:
+            break
+        applicants.extend(batch)
+        if len(batch) < batch_size:
+            break
+        start += batch_size
+    
+    if not applicants:
+        print("❌ No applicants found to backfill.")
+        return
+    
+    print(f"✅ Found {len(applicants)} applicants")
+    print()
+    
+    updated_nic_count = 0
+    credit_seeded = 0
+    repayment_seeded = 0
+    transaction_seeded = 0
+    audit_seeded = 0
+    
+    for idx, applicant in enumerate(applicants):
+        applicant_id = applicant.get("id")
+        if not applicant_id:
+            continue
+        
+        # Ensure NIC exists and is valid
+        existing_nic = normalize_nic_value(applicant.get("nic"))
+        if not existing_nic:
+            new_nic = generate_nic_from_dob(
+                str(applicant.get("date_of_birth")),
+                applicant.get("gender")
+            )
+            db.update_applicant(applicant_id, {"nic": new_nic})
+            applicant["nic"] = new_nic
+            updated_nic_count += 1
+        
+        credit_score = applicant.get("credit_score") or 650
+        profile_type = determine_profile_type(int(credit_score))
+        
+        # Seed credit history if missing
+        credit_accounts = db.get_credit_history_by_applicant(applicant_id)
+        if not credit_accounts:
+            new_credit_accounts = generate_credit_accounts(profile_type, applicant_id, int(credit_score))
+            if new_credit_accounts:
+                db.bulk_create_credit_history(new_credit_accounts)
+                credit_seeded += 1
+        
+        # Seed repayment history if missing
+        loan_records = db.get_repayment_history_by_applicant(applicant_id)
+        if not loan_records:
+            loan_records = generate_loan_history(
+                profile_type,
+                applicant_id,
+                primary_loan_amount=applicant.get("loan_amount"),
+                primary_term_months=applicant.get("loan_term_months")
+            )
+            if loan_records:
+                db.bulk_create_repayment_history(loan_records)
+                repayment_seeded += 1
+        
+        # Seed transactions if missing
+        existing_transactions = db.get_transactions_by_applicant(applicant_id)
+        if not existing_transactions:
+            transactions = generate_transactions_for_loans(applicant_id, loan_records or [])
+            if transactions:
+                db.bulk_create_transactions(transactions)
+                transaction_seeded += 1
+                existing_transactions = transactions
+        
+        # Seed audit logs if missing
+        existing_audit_logs = db.get_audit_logs(applicant_id)
+        if not existing_audit_logs:
+            audit_logs = generate_audit_logs_for_applicant(
+                applicant,
+                loan_records or [],
+                existing_transactions or [],
+                default_user_id
+            )
+            if audit_logs:
+                db.bulk_create_audit_logs(audit_logs)
+                audit_seeded += 1
+        
+        if (idx + 1) % 10 == 0:
+            print(f"  Processed {idx + 1}/{len(applicants)} applicants...")
+    
+    print()
+    print("=" * 80)
+    print("BACKFILL COMPLETE!")
+    print("=" * 80)
+    print(f"  Applicants updated with NIC: {updated_nic_count}")
+    print(f"  Credit history seeded: {credit_seeded}")
+    print(f"  Repayment history seeded: {repayment_seeded}")
+    print(f"  Transactions seeded: {transaction_seeded}")
+    print(f"  Audit logs seeded: {audit_seeded}")
+    print()
+
 if __name__ == "__main__":
-    seed_applicants()
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Seed applicants and related data")
+    parser.add_argument("--existing", action="store_true", help="Backfill data for existing applicants")
+    parser.add_argument("--clear-existing", action="store_true", help="Clear existing applicants before seeding")
+    args = parser.parse_args()
+    
+    if args.clear_existing:
+        CLEAR_EXISTING_DATA = True
+    
+    if args.existing:
+        seed_existing_applicants()
+    else:
+        seed_applicants()

@@ -35,8 +35,8 @@ export async function POST(req: NextRequest) {
     // Using networkidle0 to wait for charts/animations to likely finish
     await page.goto(reportUrl, { waitUntil: 'networkidle0' });
 
-    // Ensure the content is ready (e.g., waiting for specific selector if needed)
-    // await page.waitForSelector('#report-content'); 
+    // Ensure the content is ready before generating the PDF
+    await page.waitForSelector('#report-content', { timeout: 15000 });
 
     // Generate PDF
     const pdfBuffer = await page.pdf({

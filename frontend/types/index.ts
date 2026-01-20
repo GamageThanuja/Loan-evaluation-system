@@ -502,6 +502,15 @@ export interface EligibilityResult {
   decision: 'APPROVE' | 'REJECT';
   risk_level: string;
   summary_explanation: string;
+  feature_importance?: {
+    feature: string;
+    importance: number;
+    direction: string;
+  }[];
+  risk_analysis?: {
+    concerns?: Array<{ factor?: string; explanation?: string; severity?: string }>;
+    positive_factors?: Array<{ factor?: string; explanation?: string; severity?: string }>;
+  };
   risk_factors: FeatureInfluence[];
   protective_factors: FeatureInfluence[];
   recommendations: string[];

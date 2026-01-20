@@ -329,6 +329,32 @@ class SupabaseClient:
             self.client.table("audit_logs").insert(log_data).execute()
         except Exception as e:
             logger.error(f"Error logging action: {e}")
+
+    def get_audit_logs(self, applicant_id: int) -> List[Dict[str, Any]]:
+        """Get audit logs for an applicant"""
+        try:
+            response = (
+                self.client.table("audit_logs")
+                .select("*")
+                .eq("resource_type", "applicant")
+                .eq("resource_id", str(applicant_id))
+                .order("created_at", desc=True)
+                .execute()
+            )
+            return response.data
+        except Exception as e:
+            logger.error(f"Error getting audit logs: {e}")
+            return []
+
+    def bulk_create_audit_logs(self, records: List[Dict[str, Any]]) -> bool:
+        """Bulk insert audit log records"""
+        try:
+            self.client.table("audit_logs").insert(records).execute()
+            logger.info(f"✅ Bulk created {len(records)} audit log records")
+            return True
+        except Exception as e:
+            logger.error(f"Error bulk creating audit logs: {e}")
+            return False
     
     # ============================================
     # MODEL PERFORMANCE METHODS
@@ -448,6 +474,45 @@ class SupabaseClient:
             return True
         except Exception as e:
             logger.error(f"Error bulk creating repayment history: {e}")
+            return False
+
+    # ============================================
+    # TRANSACTION METHODS
+    # ============================================
+
+    def create_transaction(self, transaction_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Create a new transaction record"""
+        try:
+            response = self.client.table("transactions").insert(transaction_data).execute()
+            logger.info(f"✅ Transaction created for applicant: {transaction_data.get('applicant_id')}")
+            return response.data[0] if response.data else None
+        except Exception as e:
+            logger.error(f"Error creating transaction: {e}")
+            return None
+
+    def get_transactions_by_applicant(self, applicant_id: int) -> List[Dict[str, Any]]:
+        """Get all transactions for an applicant"""
+        try:
+            response = (
+                self.client.table("transactions")
+                .select("*")
+                .eq("applicant_id", applicant_id)
+                .order("transaction_date", desc=True)
+                .execute()
+            )
+            return response.data
+        except Exception as e:
+            logger.error(f"Error getting transactions: {e}")
+            return []
+
+    def bulk_create_transactions(self, records: List[Dict[str, Any]]) -> bool:
+        """Bulk insert transaction records"""
+        try:
+            self.client.table("transactions").insert(records).execute()
+            logger.info(f"✅ Bulk created {len(records)} transactions")
+            return True
+        except Exception as e:
+            logger.error(f"Error bulk creating transactions: {e}")
             return False
 
 

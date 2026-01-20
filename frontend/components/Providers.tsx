@@ -4,6 +4,7 @@ import { ThemeProvider, CssBaseline } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState, useMemo, createContext, useContext } from 'react';
+import { usePathname } from 'next/navigation';
 import createAppTheme from '@/lib/theme';
 import { storage } from '@/lib/utils';
 
@@ -34,6 +35,7 @@ interface ProvidersProps {
 }
 
 export default function Providers({ children }: ProvidersProps) {
+  const pathname = usePathname();
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return storage.get('darkMode', false);
@@ -51,13 +53,15 @@ export default function Providers({ children }: ProvidersProps) {
     });
   };
 
+  const showDevtools = process.env.NODE_ENV !== 'production' && !pathname?.startsWith('/reports/print');
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeContext.Provider value={{ darkMode, toggleDarkMode }}>
         <ThemeProvider theme={theme}>
           <CssBaseline />
           {children}
-          <ReactQueryDevtools initialIsOpen={false} />
+          {showDevtools ? <ReactQueryDevtools initialIsOpen={false} /> : null}
         </ThemeProvider>
       </ThemeContext.Provider>
     </QueryClientProvider>

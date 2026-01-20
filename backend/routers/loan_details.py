@@ -34,6 +34,14 @@ class AuditLogEntry(BaseModel):
     changes: Optional[List[Dict[str, str]]] = None
     metadata: Optional[Dict] = None
 
+
+def _deprecated_history_endpoint(message: str) -> None:
+    """Raise a standardized deprecation error for legacy loan-details history routes."""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail=message
+    )
+
 # ============================================
 # ENDPOINTS
 # ============================================
@@ -86,7 +94,7 @@ async def get_loan_details(
         )
 
 
-@router.get("/{applicant_id}/audit-log")
+@router.get("/{applicant_id}/audit-log", deprecated=True)
 async def get_audit_log(
     applicant_id: int,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
@@ -98,25 +106,12 @@ async def get_audit_log(
     
     **Authentication required**: Manager or Loan Officer
     """
-    try:
-        # TODO: Fetch from audit_logs table
-        # SELECT * FROM audit_logs WHERE applicant_id = applicant_id ORDER BY timestamp DESC
-        
-        audit_logs = []  # Replace with actual database query
-        
-        return {
-            "success": True,
-            "data": audit_logs
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch audit log: {str(e)}"
-        )
+    _deprecated_history_endpoint(
+        "This endpoint is deprecated. Use /api/applicants/{applicant_id}/audit-trail."
+    )
 
 
-@router.get("/{applicant_id}/repayment")
+@router.get("/{applicant_id}/repayment", deprecated=True)
 async def get_repayment_info(
     applicant_id: int,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
@@ -128,29 +123,12 @@ async def get_repayment_info(
     
     **Authentication required**: Manager or Loan Officer
     """
-    try:
-        # TODO: Fetch from repayment_schedule table
-        # SELECT * FROM repayment_schedule WHERE loan_id = applicant_id ORDER BY installment_number
-        
-        schedule = []  # Replace with actual database query
-        summary = {}   # Calculate summary from schedule
-        
-        return {
-            "success": True,
-            "data": {
-                "schedule": schedule,
-                "summary": summary
-            }
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch repayment info: {str(e)}"
-        )
+    _deprecated_history_endpoint(
+        "This endpoint is deprecated. Use /api/applicants/{applicant_id}/repayment-history."
+    )
 
 
-@router.get("/{applicant_id}/credit-history")
+@router.get("/{applicant_id}/credit-history", deprecated=True)
 async def get_credit_history(
     applicant_id: int,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
@@ -162,25 +140,12 @@ async def get_credit_history(
     
     **Authentication required**: Manager or Loan Officer
     """
-    try:
-        # TODO: Fetch from credit_history table
-        # SELECT * FROM credit_history WHERE applicant_id = applicant_id ORDER BY date DESC
-        
-        credit_profile = {}  # Replace with actual database query
-        
-        return {
-            "success": True,
-            "data": credit_profile
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch credit history: {str(e)}"
-        )
+    _deprecated_history_endpoint(
+        "This endpoint is deprecated. Use /api/applicants/{applicant_id}/credit-history."
+    )
 
 
-@router.get("/{applicant_id}/transactions")
+@router.get("/{applicant_id}/transactions", deprecated=True)
 async def get_transactions(
     applicant_id: int,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
@@ -192,23 +157,6 @@ async def get_transactions(
     
     **Authentication required**: Manager or Loan Officer
     """
-    try:
-        # TODO: Fetch from transactions table
-        # SELECT * FROM transactions WHERE loan_id = applicant_id ORDER BY date DESC
-        
-        transactions = []  # Replace with actual database query
-        summary = {}       # Calculate summary from transactions
-        
-        return {
-            "success": True,
-            "data": {
-                "transactions": transactions,
-                "summary": summary
-            }
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch transactions: {str(e)}"
-        )
+    _deprecated_history_endpoint(
+        "This endpoint is deprecated. Use /api/applicants/{applicant_id}/transactions."
+    )

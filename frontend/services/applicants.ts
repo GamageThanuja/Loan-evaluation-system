@@ -16,6 +16,8 @@ import {
   CreditProfile,
   RepaymentSchedule,
   RepaymentSummary,
+  Transaction,
+  TransactionSummary,
   AuditLogEntry,
 } from '@/types';
 
@@ -436,6 +438,36 @@ export const applicantService = {
     }
   },
   
+  /**
+   * Get transaction history for an applicant
+   */
+  getTransactionHistory: async (
+    applicantId: string
+  ): Promise<ApiResponse<{ transactions: Transaction[]; summary: TransactionSummary }>> => {
+    try {
+      const response = await apiClient.get(`/api/applicants/${applicantId}/transactions`);
+      const rawData = toCamelCase(response.data?.data || response.data);
+      
+      return {
+        success: true,
+        data: {
+          transactions: rawData?.transactions || [],
+          summary: rawData?.summary || {
+            totalTransactions: 0,
+            totalDebits: 0,
+            totalCredits: 0,
+            monthlyTransactions: [],
+          },
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch transaction history',
+      };
+    }
+  },
+
   /**
    * Get loan history for an applicant
    */

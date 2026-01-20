@@ -4,6 +4,7 @@ Full CRUD operations for applicants with role-based access control
 """
 
 import sys
+import re
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from datetime import datetime
@@ -61,6 +62,13 @@ class ApplicantBase(BaseModel):
     existing_loans: Optional[int] = Field(0, ge=0, description="Number of existing loans")
     monthly_expenses: Optional[float] = Field(None, ge=0, description="Monthly expenses")
 
+    @validator("nic")
+    def validate_nic(cls, value: str) -> str:
+        normalized = str(value).strip().upper()
+        if not re.match(r"^\d{9}[VX]$", normalized):
+            raise ValueError("NIC must be in format YYDDDXXXXV")
+        return normalized
+
 class ApplicantCreate(ApplicantBase):
     """Model for creating a new applicant"""
     pass
@@ -93,6 +101,15 @@ class ApplicantUpdate(BaseModel):
     credit_score: Optional[int] = Field(None, ge=300, le=850)
     existing_loans: Optional[int] = Field(None, ge=0)
     monthly_expenses: Optional[float] = Field(None, ge=0)
+
+    @validator("nic")
+    def validate_nic(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        normalized = str(value).strip().upper()
+        if not re.match(r"^\d{9}[VX]$", normalized):
+            raise ValueError("NIC must be in format YYDDDXXXXV")
+        return normalized
 
 class EligibilityRequest(BaseModel):
     """Model for eligibility check request"""
@@ -160,6 +177,65 @@ class ApplicantResponse(BaseModel):
     rejected_by: Optional[str] = None
     rejected_at: Optional[str] = None
     rejection_reason: Optional[str] = None
+
+
+# ============================================
+# HELPERS
+# ============================================
+
+AUDIT_ACTION_MAP = {
+    "CREATE_APPLICANT": "created",
+    "UPDATE_APPLICANT": "updated",
+    "STATUS_CHANGED": "status_changed",
+    "SEND_FOR_REVIEW": "reviewed",
+    "REVIEW_APPLICATION": "reviewed",
+    "APPROVE_APPLICATION": "approved",
+    "REJECT_APPLICATION": "rejected",
+    "PAYMENT_MADE": "payment_made",
+    "DOCUMENT_UPLOADED": "document_uploaded",
+    "NOTE_ADDED": "note_added",
+}
+
+KNOWN_AUDIT_ACTIONS = {
+    "created",
+    "updated",
+    "status_changed",
+    "reviewed",
+    "approved",
+    "rejected",
+    "payment_made",
+    "document_uploaded",
+    "note_added",
+}
+
+def _normalize_audit_action(action: Optional[str]) -> str:
+    if not action:
+        return "updated"
+    normalized = action.strip().lower()
+    if normalized in KNOWN_AUDIT_ACTIONS:
+        return normalized
+    mapped = AUDIT_ACTION_MAP.get(action.strip().upper())
+    return mapped or normalized
+
+def _parse_datetime(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            return datetime.strptime(str(value), "%Y-%m-%d")
+        except ValueError:
+            return None
+
+def _calculate_term_months(start_date: Optional[str], end_date: Optional[str]) -> Optional[int]:
+    start = _parse_datetime(start_date)
+    end = _parse_datetime(end_date)
+    if not start or not end:
+        return None
+    return max(1, (end.year - start.year) * 12 + (end.month - start.month))
 
 
 # ============================================
@@ -1119,9 +1195,120 @@ async def get_repayment_history(
         )
 
 
+# ============================================
+# TRANSACTION HISTORY
+# ============================================
+
+@router.get("/{applicant_id}/transactions")
+async def get_transactions_history(
+    applicant_id: int,
+    user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
+):
+    """
+    Get transaction history for an applicant
+    
+    **Access**: Loan Officers and Managers
+    """
+    try:
+        # Check applicant exists
+        applicant = db.get_applicant_by_id(applicant_id)
+        if not applicant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Applicant not found"
+            )
+        
+        transactions = db.get_transactions_by_applicant(applicant_id)
+        
+        if not transactions:
+            return {
+                "success": True,
+                "data": {
+                    "transactions": [],
+                    "summary": {
+                        "total_transactions": 0,
+                        "total_debits": 0,
+                        "total_credits": 0,
+                        "monthly_transactions": []
+                    }
+                }
+            }
+        
+        formatted_transactions = []
+        for tx in transactions:
+            formatted_transactions.append({
+                "id": tx.get("id"),
+                "date": tx.get("transaction_date") or tx.get("date") or tx.get("created_at"),
+                "type": tx.get("transaction_type") or tx.get("type"),
+                "amount": float(tx.get("amount", 0)),
+                "description": tx.get("description") or "",
+                "status": tx.get("status") or tx.get("transaction_status") or "completed",
+                "payment_method": tx.get("payment_method"),
+                "reference_number": tx.get("reference_number"),
+                "balance": float(tx.get("balance", 0)) if tx.get("balance") is not None else None,
+                "notes": tx.get("notes")
+            })
+        
+        # Sort by date (most recent first)
+        formatted_transactions.sort(
+            key=lambda t: _parse_datetime(t.get("date")) or datetime.min,
+            reverse=True
+        )
+        
+        debit_types = {"payment", "fee", "penalty", "adjustment"}
+        credit_types = {"disbursement", "refund"}
+        
+        total_debits = sum(
+            t["amount"] for t in formatted_transactions if t.get("type") in debit_types
+        )
+        total_credits = sum(
+            t["amount"] for t in formatted_transactions if t.get("type") in credit_types
+        )
+        
+        monthly_buckets = {}
+        for tx in formatted_transactions:
+            parsed_date = _parse_datetime(tx.get("date"))
+            if not parsed_date:
+                continue
+            month_key = parsed_date.strftime("%Y-%m")
+            bucket = monthly_buckets.setdefault(
+                month_key,
+                {"month": parsed_date.strftime("%b %Y"), "count": 0, "amount": 0}
+            )
+            bucket["count"] += 1
+            bucket["amount"] += tx.get("amount", 0)
+        
+        monthly_transactions = [
+            monthly_buckets[key] for key in sorted(monthly_buckets.keys(), reverse=True)
+        ]
+        
+        summary = {
+            "total_transactions": len(formatted_transactions),
+            "total_debits": round(total_debits, 2),
+            "total_credits": round(total_credits, 2),
+            "last_transaction": formatted_transactions[0] if formatted_transactions else None,
+            "monthly_transactions": monthly_transactions
+        }
+        
+        return {
+            "success": True,
+            "data": {
+                "transactions": formatted_transactions,
+                "summary": summary
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch transactions: {str(e)}"
+        )
+
+
 @router.get("/{applicant_id}/loan-history")
 async def get_loan_history(
-    applicant_id: str,
+    applicant_id: int,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
     """
@@ -1138,31 +1325,35 @@ async def get_loan_history(
                 detail="Applicant not found"
             )
         
-        # TODO: Fetch from loan history service/table
-        loan_history = [
-            {
-                "id": "LOAN001",
-                "type": "Personal Loan",
-                "amount": 500000,
-                "status": "closed",
-                "applied_date": "2022-01-10",
-                "approved_date": "2022-01-15",
-                "closed_date": "2024-01-15",
-                "term_months": 24,
-                "interest_rate": 12.5
-            },
-            {
-                "id": "LOAN002",
-                "type": "Vehicle Loan",
-                "amount": 1500000,
-                "status": "active",
-                "applied_date": "2023-06-05",
-                "approved_date": "2023-06-10",
-                "term_months": 48,
-                "interest_rate": 10.0,
-                "remaining_amount": 750000
+        # Use repayment history records as loan history source
+        loan_records = db.get_repayment_history_by_applicant(applicant_id)
+        
+        if not loan_records:
+            return {
+                "success": True,
+                "data": []
             }
-        ]
+        
+        loan_history = []
+        for loan in loan_records:
+            loan_status = loan.get("loan_status") or loan.get("payment_status") or "active"
+            start_date = loan.get("start_date")
+            maturity_date = loan.get("maturity_date") or loan.get("end_date")
+            term_months = _calculate_term_months(start_date, maturity_date)
+            
+            loan_history.append({
+                "id": loan.get("loan_id") or loan.get("id"),
+                "type": (loan.get("loan_type") or "").replace("_", " ").title(),
+                "amount": float(loan.get("original_amount", 0)),
+                "status": str(loan_status).replace("_", " "),
+                "applied_date": start_date,
+                "approved_date": start_date,
+                "closed_date": loan.get("end_date"),
+                "term_months": term_months,
+                "interest_rate": float(loan.get("interest_rate", 0)) if loan.get("interest_rate") is not None else None,
+                "remaining_amount": float(loan.get("remaining_balance", 0)) if loan.get("remaining_balance") is not None else None,
+                "lender_name": loan.get("lender_name")
+            })
         
         return {
             "success": True,
@@ -1179,7 +1370,7 @@ async def get_loan_history(
 
 @router.get("/{applicant_id}/audit-trail")
 async def get_audit_trail(
-    applicant_id: str,
+    applicant_id: int,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
     """
@@ -1199,10 +1390,54 @@ async def get_audit_trail(
             )
         
         # Fetch audit logs from database
-        try:
-            audit_logs = db.get_audit_logs(applicant_id)
-        except:
-            audit_logs = []
+        audit_log_records = db.get_audit_logs(applicant_id)
+        
+        audit_logs = []
+        for log in audit_log_records:
+            details = log.get("details") or {}
+            action = _normalize_audit_action(log.get("action"))
+            performed_by = details.get("performed_by") or {}
+            
+            if not performed_by:
+                performed_by = {
+                    "id": log.get("user_id") or "system",
+                    "name": "System",
+                    "role": "system"
+                }
+            
+            description = details.get("description")
+            if not description:
+                if action == "created":
+                    description = "Loan application created"
+                elif action == "updated":
+                    description = "Applicant record updated"
+                elif action == "reviewed":
+                    description = f"Eligibility check completed - {applicant.get('eligibility_status', 'pending')}"
+                elif action == "approved":
+                    description = "Loan application approved"
+                elif action == "rejected":
+                    description = f"Loan application rejected: {applicant.get('rejection_reason', 'Not specified')}"
+                elif action == "payment_made":
+                    description = "Payment recorded"
+                else:
+                    description = "Applicant activity recorded"
+            
+            changes = details.get("changes")
+            if not changes and details.get("updated_fields"):
+                changes = [
+                    {"field": field, "old_value": None, "new_value": "updated"}
+                    for field in details.get("updated_fields", [])
+                ]
+            
+            audit_logs.append({
+                "id": f"audit-{log.get('id')}",
+                "timestamp": log.get("created_at", datetime.utcnow().isoformat()),
+                "action": action,
+                "performed_by": performed_by,
+                "description": description,
+                "changes": changes,
+                "metadata": details.get("metadata")
+            })
         
         # If no audit logs, return mock data based on applicant status
         if not audit_logs:
@@ -1277,6 +1512,33 @@ async def get_audit_trail(
                     },
                     "description": f"Loan application rejected: {applicant.get('rejection_reason', 'Not specified')}"
                 })
+            
+            # Add recent payment entry if transactions exist
+            try:
+                transactions = db.get_transactions_by_applicant(applicant_id)
+            except Exception:
+                transactions = []
+            
+            if transactions:
+                recent_payment = None
+                for tx in transactions:
+                    tx_type = tx.get("transaction_type") or tx.get("type")
+                    if tx_type == "payment":
+                        recent_payment = tx
+                        break
+                if recent_payment:
+                    audit_logs.append({
+                        "id": f"audit-{applicant_id}-payment",
+                        "timestamp": recent_payment.get("transaction_date") or recent_payment.get("created_at") or datetime.utcnow().isoformat(),
+                        "action": "payment_made",
+                        "performed_by": {
+                            "id": applicant.get("created_by", "system"),
+                            "name": "System",
+                            "role": "system"
+                        },
+                        "description": f"Payment received of LKR {recent_payment.get('amount', 0)}",
+                        "metadata": {"reference_number": recent_payment.get("reference_number")}
+                    })
         
         return {
             "success": True,
@@ -1289,4 +1551,3 @@ async def get_audit_trail(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch audit trail: {str(e)}"
         )
-

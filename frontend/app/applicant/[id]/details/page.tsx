@@ -40,6 +40,7 @@ import {
     useLoanDetails,
     useCreditHistory,
     useRepaymentHistory,
+    useTransactionHistory,
     useAuditTrail,
 } from '@/hooks/useApplicants';
 
@@ -68,6 +69,7 @@ export default function LoanApplicationDetails() {
     const { data: loanDetails, isLoading: isLoadingLoanDetails } = useLoanDetails(applicantId);
     const { data: creditHistory, isLoading: isLoadingCredit } = useCreditHistory(applicantId);
     const { data: repaymentHistory, isLoading: isLoadingRepayment } = useRepaymentHistory(applicantId);
+    const { data: transactionHistory, isLoading: isLoadingTransactions } = useTransactionHistory(applicantId);
     const { data: auditLog, isLoading: isLoadingAudit } = useAuditTrail(applicantId);
 
     const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -446,12 +448,12 @@ export default function LoanApplicationDetails() {
                     </TabPanel>
 
                     <TabPanel value={activeTab} index={3}>
-                        {isLoadingLoanDetails ? (
+                        {isLoadingTransactions ? (
                             <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                                 <CircularProgress />
                             </Box>
-                        ) : loanDetails?.transactions && loanDetails.transactions.length > 0 ? (
-                            <TransactionList transactions={loanDetails.transactions} />
+                        ) : transactionHistory?.transactions && transactionHistory.transactions.length > 0 ? (
+                            <TransactionList transactions={transactionHistory.transactions} />
                         ) : (
                             <Alert severity="info">No transaction history available for this applicant.</Alert>
                         )}

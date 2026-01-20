@@ -313,6 +313,8 @@ export const predictionService = {
         decision: apiData.decision?.status || 'REJECT',
         risk_level: apiData.decision?.risk_level || 'Unknown',
         summary_explanation: apiData.explanation?.summary || '',
+        feature_importance: apiData.feature_importance || [],
+        risk_analysis: apiData.risk_analysis,
         risk_factors: (apiData.risk_analysis?.concerns || []).map((c: { factor?: string; explanation?: string; severity?: string }) => ({
           feature: c.factor || '',
           description: c.explanation || '',

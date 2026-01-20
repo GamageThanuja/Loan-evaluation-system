@@ -13,6 +13,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
   const [mounted, setMounted] = useState(false);
+  const isPrintRoute = pathname?.startsWith('/reports/print');
 
   useEffect(() => {
     setMounted(true);
@@ -32,6 +33,10 @@ function AppContent({ children }: { children: React.ReactNode }) {
   // Auth layout for login and register pages
   if (pathname === '/login' || pathname === '/register') {
     return children;
+  }
+
+  if (isPrintRoute) {
+    return isAuthenticated ? children : null;
   }
 
   // Main layout for authenticated pages

@@ -24,6 +24,7 @@ export const applicantKeys = {
   loanDetails: (id: string) => [...applicantKeys.all, 'loan-details', id] as const,
   creditHistory: (id: string) => [...applicantKeys.all, 'credit-history', id] as const,
   repaymentHistory: (id: string) => [...applicantKeys.all, 'repayment-history', id] as const,
+  transactions: (id: string) => [...applicantKeys.all, 'transactions', id] as const,
   loanHistory: (id: string) => [...applicantKeys.all, 'loan-history', id] as const,
   auditTrail: (id: string) => [...applicantKeys.all, 'audit-trail', id] as const,
   pendingReviews: () => [...applicantKeys.all, 'pending-reviews'] as const,
@@ -120,6 +121,21 @@ export function useRepaymentHistory(id: string) {
     queryKey: applicantKeys.repaymentHistory(id),
     queryFn: async () => {
       const response = await applicantService.getRepaymentHistory(id);
+      if (!response.success) throw new Error(response.error);
+      return response.data!;
+    },
+    enabled: !!id,
+  });
+}
+
+/**
+ * Get transaction history for applicant
+ */
+export function useTransactionHistory(id: string) {
+  return useQuery({
+    queryKey: applicantKeys.transactions(id),
+    queryFn: async () => {
+      const response = await applicantService.getTransactionHistory(id);
       if (!response.success) throw new Error(response.error);
       return response.data!;
     },

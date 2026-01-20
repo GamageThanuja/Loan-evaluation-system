@@ -22,7 +22,6 @@ import {
 } from '@mui/material';
 import {
   Search as SearchIcon,
-  Download as DownloadIcon,
   Refresh as RefreshIcon,
   PictureAsPdfRounded as PdfIcon
 } from '@mui/icons-material';
@@ -34,7 +33,6 @@ export default function ReportsPage() {
   const [page] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
-  const [reportUrls, setReportUrls] = useState<Record<number, string>>({}); // Store blob URLs
 
   // Fetch ONLY not-eligible (+ rejected) applicants (eligibilityStatus = 0)
   const {
@@ -70,18 +68,6 @@ export default function ReportsPage() {
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
 
-      // Store the URL for this applicant
-      setReportUrls(prev => ({
-        ...prev,
-        [applicantId]: url
-      }));
-
-      // Auto-trigger download first time? Optional.
-      // User said "display until report generated then it will be enable to download"
-      // So let's NOT auto-download, just enable the button.
-      // But usually "Generate" implies receiving it. Let's auto-download to be helpful but main UI change is the buttons.
-      // Actually, if I don't download, "Generate" feels broken.
-      // I will trigger download AND enable the button.
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `Rejection_Report_${applicantId}.pdf`);
@@ -98,18 +84,6 @@ export default function ReportsPage() {
         next.delete(applicantId);
         return next;
       });
-    }
-  };
-
-  const handleDownload = (applicantId: number) => {
-    const url = reportUrls[applicantId];
-    if (url) {
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Rejection_Report_${applicantId}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode?.removeChild(link);
     }
   };
 
@@ -240,15 +214,6 @@ export default function ReportsPage() {
                               sx={{ textTransform: 'none' }}
                             >
                               {downloadingIds.has(applicant.id) ? 'Generating...' : 'Generate Report'}
-                            </Button>
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              disabled={!reportUrls[applicant.id]}
-                              onClick={() => handleDownload(applicant.id)}
-                              color="primary"
-                            >
-                              <DownloadIcon />
                             </Button>
                           </Stack>
                         </TableCell>

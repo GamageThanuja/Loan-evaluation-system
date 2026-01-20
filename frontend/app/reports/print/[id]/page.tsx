@@ -1,44 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-    Box,
-    Typography,
-    Grid,
-    Paper,
-    Divider,
-    Chip,
-    List,
-    ListItem,
-    ListItemText,
-    ListItemIcon,
-    LinearProgress,
-} from '@mui/material';
-import {
-    Warning as WarningIcon,
-    CheckCircle as CheckCircleIcon,
-    TrendingUp as TrendingUpIcon,
-    AttachMoney as MoneyIcon,
-    AccountBalance as BankIcon,
-    Assessment as AssessmentIcon,
-} from '@mui/icons-material';
-import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    Legend,
-    ResponsiveContainer,
-    PieChart,
-    Pie,
-    Cell,
-    LineChart,
-    Line,
-} from 'recharts';
 import { useApplicantOperations } from '@/hooks/useApplicants';
+import { predictionService } from '@/services/prediction';
 import { formatCurrency } from '@/utils/formatters';
+import { EligibilityResult } from '@/types';
 
 interface PageProps {
     params: {
@@ -46,281 +12,342 @@ interface PageProps {
     };
 }
 
-// Mock data for charts (replace with real data if available from API)
-const CASH_FLOW_DATA = [
-    { month: 'Jan', inflow: 150000, outflow: 120000 },
-    { month: 'Feb', inflow: 145000, outflow: 125000 },
-    { month: 'Mar', inflow: 160000, outflow: 115000 },
-    { month: 'Apr', inflow: 155000, outflow: 130000 },
-    { month: 'May', inflow: 150000, outflow: 122000 },
-    { month: 'Jun', inflow: 158000, outflow: 118000 },
-];
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
-
 export default function PrintReportPage({ params }: PageProps) {
     const { id } = params;
-    const { applicant, checkEligibility, isLoading } = useApplicantOperations(id);
-    const [eligibilityData, setEligibilityData] = useState<any>(null);
+    const {
+        applicant,
+        loanDetails,
+        repaymentHistory,
+        isLoading,
+        isLoadingRepaymentHistory,
+    } = useApplicantOperations(id);
+    const [eligibilityData, setEligibilityData] = useState<EligibilityResult | null>(null);
+    const [isEligibilityLoading, setIsEligibilityLoading] = useState(false);
 
     useEffect(() => {
-        // Trigger eligibility check validation to get fresh reasoning
-        if (id) {
-            checkEligibility(id)
-                .then((response) => {
-                    if (response.success) {
-                        setEligibilityData(response.data);
-                    }
-                })
-                .catch(err => console.error("Failed to fetch eligibility", err));
+        if (!id || !applicant) {
+            setEligibilityData(null);
+            return;
         }
-    }, [id, checkEligibility]);
 
-    if (isLoading || !applicant) {
-        return <Box sx={{ p: 4, textAlign: 'center' }}>Loading report data...</Box>;
+        const applicantId = Number(id);
+        if (!Number.isFinite(applicantId)) {
+            setEligibilityData(null);
+            return;
+        }
+
+        const requestedAmount = loanDetails?.loanAmount ?? applicant.loanAmount ?? 0;
+        const termMonths = loanDetails?.loanTermMonths ?? loanDetails?.loanTerm ?? applicant.loanTermMonths ?? applicant.loanTerm ?? 12;
+        const income = loanDetails?.monthlyIncome ?? applicant.monthlyIncome;
+
+        if (requestedAmount <= 0 || termMonths <= 0) {
+            setEligibilityData(null);
+            return;
+        }
+
+        let isActive = true;
+        setIsEligibilityLoading(true);
+        predictionService
+            .checkEligibility(applicantId, requestedAmount, termMonths, income)
+            .then((response) => {
+                if (!isActive) return;
+                if (response.success && response.data) {
+                    setEligibilityData(response.data);
+                } else {
+                    setEligibilityData(null);
+                }
+            })
+            .catch(err => console.error("Failed to fetch eligibility", err))
+            .finally(() => {
+                if (isActive) setIsEligibilityLoading(false);
+            });
+
+        return () => {
+            isActive = false;
+        };
+    }, [id, applicant, loanDetails]);
+
+    if (isLoading || isLoadingRepaymentHistory || !applicant || isEligibilityLoading) {
+        return <div style={{ padding: 32, textAlign: 'center' }}>Loading report data...</div>;
     }
 
     // Derived Data
-    const monthlyIncome = applicant.monthlyIncome || 0;
-    const loanAmount = applicant.loanAmount || 0;
-    const loanTerm = applicant.loanTermMonths || 12;
-    const monthlyInstallment = loanAmount / loanTerm; // Simplified
-    const debtToIncome = (monthlyInstallment / monthlyIncome) * 100;
+    const monthlyIncome = loanDetails?.monthlyIncome ?? applicant.monthlyIncome ?? eligibilityData?.financial_profile?.monthly_income ?? 0;
+    const loanAmount = loanDetails?.loanAmount ?? applicant.loanAmount ?? eligibilityData?.loan_details?.requested_amount ?? 0;
+    const loanTerm = loanDetails?.loanTermMonths ?? loanDetails?.loanTerm ?? applicant.loanTermMonths ?? applicant.loanTerm ?? eligibilityData?.loan_details?.loan_term_months ?? 12;
+    const monthlyInstallment = loanTerm > 0 ? loanAmount / loanTerm : 0; // Simplified
+    const debtToIncome = monthlyIncome > 0 ? (monthlyInstallment / monthlyIncome) * 100 : 0;
 
-    // Exposure Distribution Data
+    const applicantName = applicant.name || `${applicant.firstName ?? ''} ${applicant.lastName ?? ''}`.trim() || 'Applicant';
+
+    const existingLoanBalance = repaymentHistory?.summary?.totalRemaining ?? applicant.existingDebtAmount ?? 0;
     const exposureData = [
-        { name: 'Existing Loans', value: 300000 }, // Mock
-        { name: 'Credit Cards', value: 50000 },   // Mock
-        { name: 'Overdrafts', value: 25000 },     // Mock
+        { name: 'Existing Loans', value: existingLoanBalance },
         { name: 'This Request', value: loanAmount },
     ];
 
+    const formatMonthLabel = (dateValue?: string) => {
+        if (!dateValue) return 'N/A';
+        const parsedDate = new Date(dateValue);
+        if (Number.isNaN(parsedDate.getTime())) return 'N/A';
+        return parsedDate.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+    };
+
+    const estimatedExistingPayment = repaymentHistory?.summary?.nextPaymentAmount ?? 0;
+    const estimatedOutflow = monthlyInstallment + estimatedExistingPayment;
+    const schedule = repaymentHistory?.schedule || [];
+    const cashFlowRows = schedule.length > 0
+        ? schedule
+            .filter((item) => item.dueDate || item.paidDate)
+            .sort((a, b) => new Date(a.dueDate || a.paidDate || '').getTime() - new Date(b.dueDate || b.paidDate || '').getTime())
+            .slice(-6)
+            .map((item) => {
+                const candidateOutflow = item.totalAmount || 0;
+                const outflow = candidateOutflow > 0 && (loanAmount ? candidateOutflow < loanAmount : true) ? candidateOutflow : estimatedOutflow;
+                return {
+                    month: formatMonthLabel(item.dueDate || item.paidDate),
+                    inflow: monthlyIncome,
+                    outflow,
+                };
+            })
+        : Array.from({ length: 6 }, (_, index) => {
+            const date = new Date();
+            date.setMonth(date.getMonth() - (5 - index));
+            return {
+                month: formatMonthLabel(date.toISOString()),
+                inflow: monthlyIncome,
+                outflow: estimatedOutflow,
+            };
+        });
+
+    const featureRows = (eligibilityData?.feature_importance && eligibilityData.feature_importance.length > 0)
+        ? eligibilityData.feature_importance
+        : [
+            ...(eligibilityData?.risk_factors || []).map((factor: any) => ({
+                feature: factor.feature || factor.feature_name || 'Risk factor',
+                importance: typeof factor.influence_strength === 'number' ? factor.influence_strength : null,
+                direction: 'increases_risk',
+            })),
+            ...(eligibilityData?.protective_factors || []).map((factor: any) => ({
+                feature: factor.feature || factor.feature_name || 'Protective factor',
+                importance: typeof factor.influence_strength === 'number' ? factor.influence_strength : null,
+                direction: 'decreases_risk',
+            })),
+        ];
+
+    const concernItems = (eligibilityData?.risk_analysis?.concerns || []).map((item) => {
+        const factor = item.factor ? `${item.factor}: ` : '';
+        const explanation = item.explanation || '';
+        return `${factor}${explanation}`.trim();
+    }).filter((item) => item);
+
+    const fallbackConcerns = (eligibilityData?.risk_factors || []).map((item: any) => {
+        const factor = item.feature || item.feature_name || 'Risk factor';
+        const explanation = item.explanation || item.description || '';
+        return explanation ? `${factor}: ${explanation}` : factor;
+    }).filter((item) => item);
+
+    const rejectionConcerns = concernItems.length > 0 ? concernItems : fallbackConcerns;
+
+    const defaultProbability = typeof eligibilityData?.probability === 'number'
+        ? eligibilityData.probability
+        : (typeof eligibilityData?.risk_score === 'number' ? eligibilityData.risk_score : null);
+    const decisionStatus = eligibilityData?.decision || 'REJECT';
+
     return (
-        <Box sx={{ p: 4, maxWidth: '210mm', mx: 'auto', bgcolor: 'white', minHeight: '100vh' }} id="report-content">
-            {/* Header */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4, borderBottom: '2px solid #1976d2', pb: 2 }}>
-                <Box>
-                    <Typography variant="h4" fontWeight={800} color="primary">
-                        Loan Rejection Report
-                    </Typography>
-                    <Typography variant="subtitle1" color="text.secondary">
-                        Confidential Assessment Document
-                    </Typography>
-                </Box>
-                <Box sx={{ textAlign: 'right' }}>
-                    <Typography variant="h6">{applicant.name}</Typography>
-                    <Typography variant="body2">ID: {applicant.id}</Typography>
-                    <Typography variant="body2">Date: {new Date().toLocaleDateString()}</Typography>
-                </Box>
-            </Box>
+        <div
+            id="report-content"
+            style={{
+                padding: 32,
+                maxWidth: '210mm',
+                margin: '0 auto',
+                background: '#ffffff',
+                minHeight: '100vh',
+                color: '#111111',
+                fontFamily: 'Arial, sans-serif',
+                lineHeight: 1.5,
+            }}
+        >
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #1976d2', paddingBottom: 12, marginBottom: 24 }}>
+                <div>
+                    <h1 style={{ margin: 0, fontSize: 28, color: '#1976d2' }}>Loan Rejection Report</h1>
+                    <div style={{ color: '#555555' }}>Confidential Assessment Document</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 16, fontWeight: 700 }}>{applicantName}</div>
+                    <div style={{ fontSize: 12 }}>ID: {applicant.id}</div>
+                    <div style={{ fontSize: 12 }}>Date: {new Date().toLocaleDateString()}</div>
+                </div>
+            </div>
 
-            {/* 1. AI Explainability (SHAP Analysis) */}
-            <Paper elevation={0} variant="outlined" sx={{ p: 3, mb: 3, bgcolor: '#f8f9fa', borderColor: '#dee2e6' }}>
-                <Typography variant="h6" fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                    <AssessmentIcon color="primary" sx={{ mr: 1 }} />
-                    1. AI Explainability (SHAP Analysis)
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                    Feature importance indicating how each factor influenced the loan decision. Positive values (Red) increase rejection risk, while negative values (Green) improve eligibility.
-                </Typography>
+            <div style={{ border: '1px solid #dee2e6', background: '#f8f9fa', padding: 16, marginBottom: 16 }}>
+                <h2 style={{ marginTop: 0, fontSize: 18 }}>1. AI Explainability (SHAP Analysis)</h2>
+                <p style={{ marginTop: 0, color: '#555555' }}>
+                    Feature importance indicating how each factor influenced the loan decision. Positive values increase rejection risk, while negative values improve eligibility.
+                </p>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                        <tr>
+                            <th style={{ textAlign: 'left', borderBottom: '1px solid #cccccc', paddingBottom: 6 }}>Feature</th>
+                            <th style={{ textAlign: 'left', borderBottom: '1px solid #cccccc', paddingBottom: 6 }}>Impact</th>
+                            <th style={{ textAlign: 'left', borderBottom: '1px solid #cccccc', paddingBottom: 6 }}>Direction</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {featureRows.map((entry: any, index: number) => (
+                            <tr key={`feature-${index}`}>
+                                <td style={{ padding: '6px 0' }}>{entry.feature}</td>
+                                <td style={{ padding: '6px 0' }}>
+                                    {typeof entry.importance === 'number' ? `${(entry.importance * 100).toFixed(1)}%` : 'N/A'}
+                                </td>
+                                <td style={{ padding: '6px 0' }}>
+                                    {entry.direction === 'increases_risk'
+                                        ? 'Increases risk'
+                                        : entry.direction === 'decreases_risk'
+                                            ? 'Improves eligibility'
+                                            : 'Neutral'}
+                                </td>
+                            </tr>
+                        ))}
+                        {featureRows.length === 0 && (
+                            <tr>
+                                <td colSpan={3} style={{ padding: '6px 0', color: '#777777' }}>No feature importance data available.</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
 
-                <Box sx={{ height: 350, mt: 2 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                            data={eligibilityData?.feature_importance || []}
-                            layout="vertical"
-                            margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-                        >
-                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                            <XAxis type="number" domain={[-1, 1]} hide />
-                            <YAxis
-                                dataKey="feature"
-                                type="category"
-                                width={120}
-                                style={{ fontSize: '12px' }}
-                            />
-                            <Tooltip
-                                formatter={(value: number) => [`${(value * 100).toFixed(1)}% Strength`, 'Impact']}
-                            />
-                            <Bar
-                                dataKey="importance"
-                                radius={[0, 4, 4, 0]}
-                            >
-                                {eligibilityData?.feature_importance?.map((entry: any, index: number) => (
-                                    <Cell
-                                        key={`cell-${index}`}
-                                        fill={entry.direction === 'increases_risk' ? '#f44336' : '#4caf50'}
-                                    />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                </Box>
-            </Paper>
-
-            {/* 2. Key Rejection Reasons */}
-            <Paper elevation={0} variant="outlined" sx={{ p: 3, mb: 3, bgcolor: '#fff5f5', borderColor: '#ffcdd2' }}>
-                <Typography variant="h6" fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                    <WarningIcon color="error" sx={{ mr: 1 }} />
-                    2. Key Rejection Reasons
-                </Typography>
-                <Typography variant="body1" paragraph>
+            <div style={{ border: '1px solid #ffcdd2', background: '#fff5f5', padding: 16, marginBottom: 16 }}>
+                <h2 style={{ marginTop: 0, fontSize: 18 }}>2. Key Rejection Reasons</h2>
+                <p style={{ marginTop: 0 }}>
                     The application for <strong>{formatCurrency(loanAmount)}</strong> was declined due to the following primary concerns:
-                </Typography>
+                </p>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {rejectionConcerns.map((reason: string, index: number) => (
+                        <li key={`reason-${index}`} style={{ marginBottom: 6 }}>{reason}</li>
+                    ))}
+                    {rejectionConcerns.length === 0 && (
+                        <li style={{ color: '#777777' }}>No detailed concerns found.</li>
+                    )}
+                </ul>
+            </div>
 
-                <Grid container spacing={2}>
-                    {eligibilityData?.risk_analysis?.concerns?.map((reason: string, index: number) => (
-                        <Grid item xs={12} key={index}>
-                            <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
-                                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'error.main', mt: 1, mr: 2 }} />
-                                <Typography variant="body2" sx={{ lineHeight: 1.6 }}>
-                                    {reason}
-                                </Typography>
-                            </Box>
-                        </Grid>
-                    )) || (
-                            <Typography variant="body2" color="text.secondary" sx={{ ml: 4 }}>
-                                No detailed concerns found.
-                            </Typography>
-                        )}
-                </Grid>
-            </Paper>
-
-            {/* 3. Eligibility Improvement Suggestions */}
-            <Paper elevation={0} variant="outlined" sx={{ p: 3, mb: 3, bgcolor: '#f0f9ff', borderColor: '#b3e5fc' }}>
-                <Typography variant="h6" fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                    <TrendingUpIcon color="primary" sx={{ mr: 1 }} />
-                    3. Eligibility Improvement Suggestions
-                </Typography>
-                <List dense>
+            <div style={{ border: '1px solid #b3e5fc', background: '#f0f9ff', padding: 16, marginBottom: 24 }}>
+                <h2 style={{ marginTop: 0, fontSize: 18 }}>3. Eligibility Improvement Suggestions</h2>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
                     {eligibilityData?.recommendations?.map((rec: string, index: number) => (
-                        <ListItem key={index}>
-                            <ListItemIcon>
-                                <CheckCircleIcon color="success" fontSize="small" />
-                            </ListItemIcon>
-                            <ListItemText primary={rec} />
-                        </ListItem>
-                    )) || (
-                            <ListItem>
-                                <ListItemText primary="No specific recommendations available." />
-                            </ListItem>
-                        )}
-                </List>
-            </Paper>
+                        <li key={`rec-${index}`} style={{ marginBottom: 6 }}>{rec}</li>
+                    ))}
+                    {(!eligibilityData?.recommendations || eligibilityData.recommendations.length === 0) && (
+                        <li style={{ color: '#777777' }}>No specific recommendations available.</li>
+                    )}
+                </ul>
+            </div>
 
-            <Divider sx={{ my: 4 }} />
+            <div style={{ borderTop: '1px solid #dddddd', margin: '24px 0' }} />
 
-            {/* 3. Customer Profile & Exposure */}
-            <Typography variant="h6" fontWeight={700} gutterBottom sx={{ mb: 2 }}>
-                3. Customer Profile & Exposure
-            </Typography>
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-                <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle2" align="center" gutterBottom>Total Exposure Distribution</Typography>
-                    <ResponsiveContainer width="100%" height={250}>
-                        <PieChart>
-                            <Pie
-                                data={exposureData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={60}
-                                outerRadius={80}
-                                paddingAngle={5}
-                                dataKey="value"
-                            >
-                                {exposureData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Pie>
-                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                            <Legend />
-                        </PieChart>
-                    </ResponsiveContainer>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <Typography variant="subtitle2" gutterBottom>Debt-to-Income Ratio</Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                            <Typography variant="h4" fontWeight={700} color={debtToIncome > 50 ? 'error.main' : 'warning.main'}>
-                                {debtToIncome.toFixed(1)}%
-                            </Typography>
-                            <Typography variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>(Threshold: 40%)</Typography>
-                        </Box>
-                        <LinearProgress
-                            variant="determinate"
-                            value={Math.min(debtToIncome, 100)}
-                            color={debtToIncome > 50 ? 'error' : 'warning'}
-                            sx={{ height: 10, borderRadius: 5 }}
+            <h2 style={{ fontSize: 18 }}>4. Customer Profile & Exposure</h2>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
+                <div style={{ flex: '1 1 280px' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Total Exposure Distribution</div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                        <thead>
+                            <tr>
+                                <th style={{ textAlign: 'left', borderBottom: '1px solid #cccccc', paddingBottom: 6 }}>Type</th>
+                                <th style={{ textAlign: 'right', borderBottom: '1px solid #cccccc', paddingBottom: 6 }}>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {exposureData.map((entry, index) => (
+                                <tr key={`exposure-${index}`}>
+                                    <td style={{ padding: '6px 0' }}>{entry.name}</td>
+                                    <td style={{ padding: '6px 0', textAlign: 'right' }}>{formatCurrency(entry.value)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                <div style={{ flex: '1 1 280px' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Debt-to-Income Ratio</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: debtToIncome > 50 ? '#d32f2f' : '#ed6c02' }}>
+                            {debtToIncome.toFixed(1)}%
+                        </div>
+                        <div style={{ fontSize: 12, color: '#777777' }}>(Threshold: 40%)</div>
+                    </div>
+                    <div style={{ marginTop: 8, background: '#eeeeee', height: 10, borderRadius: 6 }}>
+                        <div
+                            style={{
+                                width: `${Math.min(debtToIncome, 100)}%`,
+                                height: '100%',
+                                borderRadius: 6,
+                                background: debtToIncome > 50 ? '#d32f2f' : '#ed6c02',
+                            }}
                         />
-                    </Box>
-                </Grid>
-            </Grid>
+                    </div>
+                </div>
+            </div>
 
-            {/* 4. Cash Flow & Repayment Capacity */}
-            <Typography variant="h6" fontWeight={700} gutterBottom sx={{ mb: 2 }}>
-                4. Cash Flow & Repayment Capacity
-            </Typography>
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-                <Grid item xs={12}>
-                    <Typography variant="subtitle2" align="center" gutterBottom>Analyze Monthly Inflows vs Outflows</Typography>
-                    <ResponsiveContainer width="100%" height={250}>
-                        <LineChart data={CASH_FLOW_DATA}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="month" />
-                            <YAxis />
-                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                            <Legend />
-                            <Line type="monotone" dataKey="inflow" stroke="#2e7d32" strokeWidth={2} name="Total Inflow" />
-                            <Line type="monotone" dataKey="outflow" stroke="#d32f2f" strokeWidth={2} name="Total Outflow" />
-                        </LineChart>
-                    </ResponsiveContainer>
-                </Grid>
-            </Grid>
+            <h2 style={{ fontSize: 18 }}>5. Cash Flow & Repayment Capacity</h2>
+            <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Monthly Inflows vs Outflows</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                        <tr>
+                            <th style={{ textAlign: 'left', borderBottom: '1px solid #cccccc', paddingBottom: 6 }}>Month</th>
+                            <th style={{ textAlign: 'right', borderBottom: '1px solid #cccccc', paddingBottom: 6 }}>Inflow</th>
+                            <th style={{ textAlign: 'right', borderBottom: '1px solid #cccccc', paddingBottom: 6 }}>Outflow</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {cashFlowRows.map((row) => (
+                            <tr key={row.month}>
+                                <td style={{ padding: '6px 0' }}>{row.month}</td>
+                                <td style={{ padding: '6px 0', textAlign: 'right' }}>{formatCurrency(row.inflow)}</td>
+                                <td style={{ padding: '6px 0', textAlign: 'right' }}>{formatCurrency(row.outflow)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
 
-            {/* 5. Collateral Analysis  */}
-            <Typography variant="h6" fontWeight={700} gutterBottom sx={{ mb: 2 }}>
-                5. Collateral Analysis
-            </Typography>
-            <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2, mb: 4 }}>
-                <Typography variant="body2" color="text.secondary" align="center">
-                    No collateral data linked to this application.
-                    LTV Ratio cannot be calculated.
-                </Typography>
-            </Box>
+            <h2 style={{ fontSize: 18 }}>6. Collateral Analysis</h2>
+            <div style={{ padding: 12, background: '#f7f7f7', marginBottom: 24, fontSize: 12, textAlign: 'center', color: '#777777' }}>
+                No collateral data linked to this application. LTV Ratio cannot be calculated.
+            </div>
 
-            {/* 6. Risk Scoring & Decisioning */}
-            <Typography variant="h6" fontWeight={700} gutterBottom sx={{ mb: 2 }}>
-                6. Risk Scoring & Decisioning
-            </Typography>
-            <Grid container spacing={2}>
-                <Grid item xs={6} md={3}>
-                    <Paper sx={{ p: 2, textAlign: 'center', bgcolor: '#f5f5f5' }}>
-                        <Typography variant="caption">Credit Score</Typography>
-                        <Typography variant="h5" fontWeight={700}>{applicant.creditScore || 'N/A'}</Typography>
-                    </Paper>
-                </Grid>
-                <Grid item xs={6} md={3}>
-                    <Paper sx={{ p: 2, textAlign: 'center', bgcolor: '#ffebee', color: 'error.main' }}>
-                        <Typography variant="caption">Default Probability</Typography>
-                        <Typography variant="h5" fontWeight={700}>
-                            {eligibilityData?.prediction?.probability ? (eligibilityData.prediction.probability * 100).toFixed(1) + '%' : 'N/A'}
-                        </Typography>
-                    </Paper>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                    <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'error.main', color: 'white' }}>
-                        <Typography variant="subtitle1">Final Decision</Typography>
-                        <Typography variant="h5" fontWeight={800}>DECLINE</Typography>
-                    </Paper>
-                </Grid>
-            </Grid>
+            <h2 style={{ fontSize: 18 }}>7. Risk Scoring & Decisioning</h2>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 140px', border: '1px solid #dddddd', padding: 12, textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: '#666666' }}>Credit Score</div>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>{applicant.creditScore || 'N/A'}</div>
+                </div>
+                <div style={{ flex: '1 1 140px', border: '1px solid #ffebee', padding: 12, textAlign: 'center', color: '#d32f2f' }}>
+                    <div style={{ fontSize: 11 }}>Default Probability</div>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>
+                        {typeof defaultProbability === 'number' ? (defaultProbability * 100).toFixed(1) + '%' : 'N/A'}
+                    </div>
+                </div>
+                <div
+                    style={{
+                        flex: '2 1 240px',
+                        background: decisionStatus === 'APPROVE' ? '#2e7d32' : '#d32f2f',
+                        color: '#ffffff',
+                        padding: 12,
+                        textAlign: 'center',
+                    }}
+                >
+                    <div style={{ fontSize: 13 }}>Final Decision</div>
+                    <div style={{ fontSize: 22, fontWeight: 800 }}>
+                        {decisionStatus === 'APPROVE' ? 'APPROVE' : 'DECLINE'}
+                    </div>
+                </div>
+            </div>
 
-            {/* Footer */}
-            <Box sx={{ mt: 8, textAlign: 'center', color: 'text.secondary' }}>
-                <Typography variant="caption">
-                    Generated by Intelligent Loan Evaluation System on {new Date().toLocaleString()}
-                </Typography>
-            </Box>
-        </Box>
+            <div style={{ marginTop: 32, textAlign: 'center', color: '#777777', fontSize: 11 }}>
+                Generated by Intelligent Loan Evaluation System on {new Date().toLocaleString()}
+            </div>
+        </div>
     );
 }
