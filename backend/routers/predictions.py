@@ -936,6 +936,16 @@ async def check_eligibility(
                 # Recommendations
                 "recommendations": smart_recommendations,
                 
+                # Feature Importance (for SHAP-like charts)
+                "feature_importance": [
+                    {
+                        "feature": f.feature_name.replace('_', ' ').title(),
+                        "importance": f.influence_strength,
+                        "direction": f.influence_direction
+                    }
+                    for f in (risk_factors[:5] + protective_factors[:5])
+                ],
+                
                 # Model Transparency
                 "model_info": {
                     "model_type": "Hybrid AI System (Machine Learning + Probabilistic Analysis)",

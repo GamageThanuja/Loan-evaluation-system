@@ -17,7 +17,7 @@ import {
 export const applicantKeys = {
   all: ['applicants'] as const,
   lists: () => [...applicantKeys.all, 'list'] as const,
-  list: (filters: { page?: number; search?: string; status?: string }) =>
+  list: (filters: { page?: number; search?: string; status?: string; eligibilityStatus?: string | number }) =>
     [...applicantKeys.lists(), filters] as const,
   details: () => [...applicantKeys.all, 'detail'] as const,
   detail: (id: string) => [...applicantKeys.details(), id] as const,
@@ -38,12 +38,13 @@ export function useApplicants(
   page: number = 1,
   pageSize: number = 10,
   search?: string,
-  status?: string
+  status?: string,
+  eligibilityStatus?: string | number
 ) {
   return useQuery({
-    queryKey: applicantKeys.list({ page, search, status }),
+    queryKey: applicantKeys.list({ page, search, status, eligibilityStatus }),
     queryFn: async () => {
-      const response = await applicantService.getApplicants(page, pageSize, search, status);
+      const response = await applicantService.getApplicants(page, pageSize, search, status, eligibilityStatus);
       if (!response.success) throw new Error(response.error);
       return response.data!;
     },

@@ -53,7 +53,8 @@ export const applicantService = {
     page: number = 1,
     pageSize: number = 10,
     search?: string,
-    status?: string
+    status?: string,
+    eligibilityStatus?: string | number
   ): Promise<ApiResponse<PaginatedResponse<Applicant>>> => {
     try {
       const params = new URLSearchParams({
@@ -63,6 +64,7 @@ export const applicantService = {
       
       if (search) params.append('search', search);
       if (status) params.append('status', status);
+      if (eligibilityStatus !== undefined) params.append('eligibility_status', eligibilityStatus.toString());
       
       const response = await apiClient.get(`/api/applicants?${params.toString()}`);
       

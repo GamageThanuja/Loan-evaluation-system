@@ -1,25 +1,266 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Box,
   Typography,
+  Card,
+  CardContent,
+  TextField,
+  InputAdornment,
+  Button,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Stack,
+  CircularProgress,
 } from '@mui/material';
-import ShapReports from '@/components/reports/ShapReports';
+import {
+  Search as SearchIcon,
+  Download as DownloadIcon,
+  Refresh as RefreshIcon,
+  PictureAsPdfRounded as PdfIcon
+} from '@mui/icons-material';
+import { useApplicants } from '@/hooks/useApplicants';
+import { TableSkeleton } from '@/components/ui/LoadingSkeleton';
+import axios from 'axios';
 
 export default function ReportsPage() {
+  const [page] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
+  const [reportUrls, setReportUrls] = useState<Record<number, string>>({}); // Store blob URLs
+
+  // Fetch ONLY not-eligible (+ rejected) applicants (eligibilityStatus = 0)
+  const {
+    data,
+    isLoading,
+    error,
+    refetch
+  } = useApplicants(page, 10, searchTerm, undefined, 0);
+
+  const handleGenerateReport = async (applicantId: number) => {
+    try {
+      setDownloadingIds(prev => new Set(prev).add(applicantId));
+
+      // Get full auth state from localStorage
+      let authData = null;
+      try {
+        const authStorage = localStorage.getItem('auth-storage');
+        if (authStorage) {
+          authData = JSON.parse(authStorage);
+        }
+      } catch (e) {
+        console.error("Error reading auth state", e);
+      }
+
+      const response = await axios.post('/api/reports/generate',
+        { applicantId, authState: authData },
+        {
+          responseType: 'blob',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+
+      // Store the URL for this applicant
+      setReportUrls(prev => ({
+        ...prev,
+        [applicantId]: url
+      }));
+
+      // Auto-trigger download first time? Optional.
+      // User said "display until report generated then it will be enable to download"
+      // So let's NOT auto-download, just enable the button.
+      // But usually "Generate" implies receiving it. Let's auto-download to be helpful but main UI change is the buttons.
+      // Actually, if I don't download, "Generate" feels broken.
+      // I will trigger download AND enable the button.
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Rejection_Report_${applicantId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+
+    } catch (error) {
+      console.error("Download failed:", error);
+      alert("Failed to generate report. Please try again.");
+    } finally {
+      setDownloadingIds(prev => {
+        const next = new Set(prev);
+        next.delete(applicantId);
+        return next;
+      });
+    }
+  };
+
+  const handleDownload = (applicantId: number) => {
+    const url = reportUrls[applicantId];
+    if (url) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Rejection_Report_${applicantId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+    }
+  };
+
   return (
     <Box>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" gutterBottom fontWeight={700}>
-          SHAP Explainability Reports
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Comprehensive SHAP (SHapley Additive exPlanations) analysis and visualizations
-        </Typography>
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box>
+          <Typography variant="h4" gutterBottom fontWeight={700}>
+            Reports
+          </Typography>
+        </Box>
       </Box>
 
-      {/* SHAP Explainability Analysis */}
-      <ShapReports />
+      {/* Filters & Search */}
+      <Card sx={{ mb: 4, p: 2 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+          <TextField
+            fullWidth
+            placeholder="Search by name, NIC, or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon color="action" />
+                </InputAdornment>
+              ),
+            }}
+            size="small"
+          />
+          <Button
+            startIcon={<RefreshIcon />}
+            onClick={() => refetch()}
+            variant="outlined"
+          >
+            Refresh
+          </Button>
+        </Stack>
+      </Card>
+
+      {/* Applicants Table */}
+      <Card>
+        <CardContent>
+          <Typography variant="h6" gutterBottom fontWeight={600}>
+            Rejected / Not Eligible Applicants
+          </Typography>
+
+          {isLoading ? (
+            <Box sx={{ p: 2 }}>
+              <TableSkeleton rows={5} />
+            </Box>
+          ) : error ? (
+            <Typography color="error">Failed to load applicants</Typography>
+          ) : (
+            <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e0e0e0' }}>
+              <Table>
+                <TableHead sx={{ bgcolor: 'grey.50' }}>
+                  <TableRow>
+                    <TableCell>Applicant Details</TableCell>
+                    <TableCell>Loan Request</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Risk Assessment</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {data?.items.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                        <Typography color="text.secondary">
+                          No rejected applications found matching your criteria.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    data?.items.map((applicant) => (
+                      <TableRow key={applicant.id} hover>
+                        <TableCell>
+                          <Typography variant="subtitle2" fontWeight={600}>
+                            {applicant.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {applicant.nic}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {applicant.email}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            LKR {applicant.loanAmount?.toLocaleString()}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {applicant.loanTermMonths} months
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          {/* Display detailed status logic */}
+                          {applicant.status === 'rejected' ? (
+                            <Chip
+                              label="Rejected"
+                              color="error"
+                              size="small"
+                            />
+                          ) : (
+                            <Chip
+                              label="Not Eligible"
+                              color="warning"
+                              size="small"
+                              variant="outlined"
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {/* Show Credit Score if available, else generic risk indicator */}
+                          <Typography variant="body2">
+                            Credit Score: {applicant.creditScore || 'N/A'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Stack direction="row" spacing={1} justifyContent="flex-end">
+                            <Button
+                              variant="contained"
+                              size="small"
+                              startIcon={downloadingIds.has(applicant.id) ? <CircularProgress size={20} color="inherit" /> : <PdfIcon />}
+                              onClick={() => handleGenerateReport(applicant.id)}
+                              disabled={downloadingIds.has(applicant.id)}
+                              sx={{ textTransform: 'none' }}
+                            >
+                              {downloadingIds.has(applicant.id) ? 'Generating...' : 'Generate Report'}
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              disabled={!reportUrls[applicant.id]}
+                              onClick={() => handleDownload(applicant.id)}
+                              color="primary"
+                            >
+                              <DownloadIcon />
+                            </Button>
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </CardContent>
+      </Card>
     </Box>
   );
 }

@@ -132,6 +132,7 @@ class SupabaseClient:
         self,
         user_id: str,
         status: Optional[str] = None,
+        eligibility_status: Optional[str] = None,
         search: Optional[str] = None,
         page: int = 1,
         page_size: int = 10
@@ -145,6 +146,14 @@ class SupabaseClient:
             # Filter by status if provided
             if status:
                 query = query.eq("status", status)
+
+            # Filter by eligibility_status if provided
+            if eligibility_status:
+                if eligibility_status == 'not_eligible':
+                    # For reports: include both AI-ineligible AND manually rejected
+                    query = query.or_(f"eligibility_status.eq.not_eligible,status.eq.rejected")
+                else:
+                    query = query.eq("eligibility_status", eligibility_status)
             
             # Search by name, email, or NIC if provided
             if search and search.strip():

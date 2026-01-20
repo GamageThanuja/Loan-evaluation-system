@@ -171,6 +171,7 @@ async def list_applicants(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=100, description="Items per page"),
     status_filter: Optional[str] = Query(None, alias="status", description="Filter by status"),
+    eligibility_status: Optional[str] = Query(None, description="Filter by eligibility (eligible/not_eligible or 1/0)"),
     search: Optional[str] = Query(None, description="Search by name, email, or NIC"),
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
@@ -185,9 +186,17 @@ async def list_applicants(
     - Eligibility status
     """
     try:
+        # Handle numeric eligibility status (1=eligible, 0=not_eligible)
+        final_eligibility_status = eligibility_status
+        if eligibility_status == "1":
+            final_eligibility_status = "eligible"
+        elif eligibility_status == "0":
+            final_eligibility_status = "not_eligible"
+
         result = db.get_applicants(
             user_id=user["user_id"],
             status=status_filter,
+            eligibility_status=final_eligibility_status,
             search=search,
             page=page,
             page_size=page_size
