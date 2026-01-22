@@ -354,6 +354,19 @@ async def get_applicant(
         first_name = name_parts[0] if len(name_parts) > 0 else ""
         last_name = name_parts[1] if len(name_parts) > 1 else ""
         
+        # Calculate age from date_of_birth
+        age = None
+        date_of_birth = applicant.get("date_of_birth")
+        if date_of_birth:
+            try:
+                if isinstance(date_of_birth, str):
+                    birth_date = datetime.strptime(date_of_birth, "%Y-%m-%d")
+                else:
+                    birth_date = date_of_birth
+                age = int((datetime.now() - birth_date).days / 365.25)
+            except (ValueError, TypeError):
+                age = None
+        
         # Map database fields to frontend expected format
         response_data = {
             "id": applicant.get("id"),
@@ -362,9 +375,11 @@ async def get_applicant(
             "name": full_name,
             "email": applicant.get("email"),
             "phone": applicant.get("phone"),
-            "date_of_birth": applicant.get("date_of_birth"),
+            "date_of_birth": date_of_birth,
+            "age": age,
             "gender": applicant.get("gender"),
             "marital_status": applicant.get("marital_status"),
+            "dependents": applicant.get("dependents"),  # May not exist in DB, will be None
             "nic": applicant.get("nic"),
             
             # Employment - map from database columns

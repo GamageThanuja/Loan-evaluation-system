@@ -19,6 +19,8 @@ import {
   Tab,
   Paper,
   CircularProgress,
+  Avatar,
+  Divider,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -31,17 +33,47 @@ import {
   Psychology,
   Lightbulb,
   PlayArrow,
+  AccountBalance,
+  Receipt,
+  CreditScore as CreditScoreIcon,
+  Warning,
+  Pending,
 } from '@mui/icons-material';
 import { useRouter, useParams } from 'next/navigation';
 import { useApplicant, useApproveLoan, useRejectLoan } from '@/hooks/usePrediction';
+import {
+  useLoanDetails,
+  useCreditHistory,
+  useRepaymentHistory,
+  useTransactionHistory,
+  useAuditTrail,
+} from '@/hooks/useApplicants';
 import { useAuth } from '@/hooks/useAuth';
 import { DetailSkeleton } from '@/components/ui/LoadingSkeleton';
 import RiskAssessment from '@/components/loan/RiskAssessment';
 import BayesianReasoning from '@/components/loan/BayesianReasoning';
 import MitigationSuggestions from '@/components/loan/MitigationSuggestions';
+import AuditTrail from '@/components/loan/AuditTrail';
+import RepaymentHistory from '@/components/loan/RepaymentHistory';
+import CreditHistory from '@/components/loan/CreditHistory';
+import TransactionList from '@/components/loan/TransactionList';
 import { formatCurrency, getRiskLevel } from '@/lib/utils';
 import predictionService from '@/services/prediction';
 import { Applicant } from '@/types';
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel({ children, value, index }: TabPanelProps) {
+  return (
+    <div role="tabpanel" hidden={value !== index}>
+      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
+    </div>
+  );
+}
 
 export default function ApplicantDetailPage() {
   const router = useRouter();
@@ -50,6 +82,11 @@ export default function ApplicantDetailPage() {
   const { isManager } = useAuth();
 
   const { data: applicant, isLoading: applicantLoading, refetch: refetchApplicant } = useApplicant(applicantId);
+  const { data: loanDetails, isLoading: isLoadingLoanDetails } = useLoanDetails(applicantId);
+  const { data: creditHistory, isLoading: isLoadingCredit } = useCreditHistory(applicantId);
+  const { data: repaymentHistory, isLoading: isLoadingRepayment } = useRepaymentHistory(applicantId);
+  const { data: transactionHistory, isLoading: isLoadingTransactions } = useTransactionHistory(applicantId);
+  const { data: auditLog, isLoading: isLoadingAudit } = useAuditTrail(applicantId);
   const approveLoan = useApproveLoan();
   const rejectLoan = useRejectLoan();
 
@@ -60,15 +97,44 @@ export default function ApplicantDetailPage() {
   const [checkingEligibility, setCheckingEligibility] = useState(false);
   const [eligibilityError, setEligibilityError] = useState<string | null>(null);
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return 'success';
+      case 'rejected':
+        return 'error';
+      case 'under_review':
+        return 'warning';
+      default:
+        return 'default';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return <CheckCircle fontSize="small" />;
+      case 'rejected':
+        return <Cancel fontSize="small" />;
+      case 'under_review':
+        return <Pending fontSize="small" />;
+      default:
+        return <Warning fontSize="small" />;
+    }
+  };
+
   if (applicantLoading) {
     return <DetailSkeleton />;
   }
 
   if (!applicant) {
     return (
-      <Alert severity="error">
-        Applicant not found
-      </Alert>
+      <Box sx={{ p: 4 }}>
+        <Button startIcon={<ArrowBack />} onClick={() => router.back()} sx={{ mb: 2 }}>
+          Back
+        </Button>
+        <Alert severity="error">Applicant not found</Alert>
+      </Box>
     );
   }
 
@@ -155,30 +221,101 @@ export default function ApplicantDetailPage() {
 
   return (
     <Box>
+      {/* Header */}
       <Box sx={{ mb: 3 }}>
         <Button startIcon={<ArrowBack />} onClick={() => router.back()} sx={{ mb: 2 }}>
           Back
         </Button>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <Box>
-            <Typography variant="h4" gutterBottom fontWeight={700}>
-              {applicant.firstName} {applicant.lastName}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Application ID: {applicant.id}
-            </Typography>
-          </Box>
-          <Chip
-            label={(applicant.status || 'pending').toUpperCase()}
-            color={
-              applicant.status === 'approved'
-                ? 'success'
-                : applicant.status === 'rejected'
-                  ? 'error'
-                  : 'warning'
-            }
-          />
-        </Box>
+
+        <Paper sx={{ p: 3 }}>
+          <Grid container spacing={3} alignItems="center">
+            <Grid item>
+              <Avatar
+                sx={{
+                  width: 80,
+                  height: 80,
+                  bgcolor: 'primary.main',
+                  fontSize: '2rem',
+                }}
+              >
+                {applicant.firstName?.[0] || (applicant as any).name?.[0] || 'U'}{applicant.lastName?.[0] || ''}
+              </Avatar>
+            </Grid>
+
+            <Grid item xs>
+              <Typography variant="h4" fontWeight={700} gutterBottom>
+                {applicant.firstName && applicant.lastName 
+                  ? `${applicant.firstName} ${applicant.lastName}` 
+                  : (applicant as any).name || 'Unknown'}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                <Chip
+                  label={(applicant.status || 'pending').toUpperCase().replace('_', ' ')}
+                  color={getStatusColor(applicant.status || 'pending')}
+                  size="small"
+                  icon={getStatusIcon(applicant.status || 'pending')}
+                />
+                <Chip
+                  label={`Loan ID: ${applicant.id}`}
+                  variant="outlined"
+                  size="small"
+                />
+                <Typography variant="body2" color="text.secondary">
+                  {applicant.email}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {applicant.phone}
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+
+          <Divider sx={{ my: 3 }} />
+
+          {/* Key Metrics */}
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Loan Amount
+                </Typography>
+                <Typography variant="h6" fontWeight={600}>
+                  {formatCurrency(applicant.loanAmount || 0)}
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Interest Rate
+                </Typography>
+                <Typography variant="h6" fontWeight={600}>
+                  {loanDetails?.interestRate ?? (applicant as any).interestRate ?? 'N/A'}%
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Monthly Payment
+                </Typography>
+                <Typography variant="h6" fontWeight={600}>
+                  {formatCurrency(loanDetails?.monthlyPayment ?? (applicant as any).monthlyPayment ?? 0)}
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Credit Score
+                </Typography>
+                <Typography variant="h6" fontWeight={600} color="success.main">
+                  {applicant.creditScore ?? 'N/A'}
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </Paper>
       </Box>
 
       {/* Eligibility Error */}
@@ -187,43 +324,6 @@ export default function ApplicantDetailPage() {
           {eligibilityError}
         </Alert>
       )}
-
-      {/* Run Eligibility Check Card - Show if not checked yet */}
-      {!hasPrediction && (
-        <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Box>
-                <Typography variant="h6" fontWeight={600} sx={{ color: 'white', mb: 0.5 }}>
-                  Eligibility Not Checked Yet
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                  Run the AI-powered eligibility check to get a loan recommendation
-                </Typography>
-              </Box>
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={checkingEligibility ? <CircularProgress size={20} color="inherit" /> : <PlayArrow />}
-                onClick={handleRunEligibilityCheck}
-                disabled={checkingEligibility}
-                sx={{
-                  bgcolor: 'white',
-                  color: '#f5576c',
-                  fontWeight: 600,
-                  px: 3,
-                  '&:hover': {
-                    bgcolor: 'rgba(255, 255, 255, 0.9)',
-                  },
-                }}
-              >
-                {checkingEligibility ? 'Checking...' : 'Run Eligibility Check'}
-              </Button>
-            </Box>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Decision Banner - Show if eligibility was checked */}
       {hasPrediction && (
         <Alert
@@ -249,241 +349,296 @@ export default function ApplicantDetailPage() {
         </Alert>
       )}
 
-      {/* View Detailed Information Button */}
-      <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Box>
-              <Typography variant="h6" fontWeight={600} sx={{ color: 'white', mb: 0.5 }}>
-                View Comprehensive Loan Details
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                Access repayment history, credit history, transactions, and complete audit trail
-              </Typography>
-            </Box>
-            <Button
-              variant="contained"
-              size="large"
-              startIcon={<History />}
-              onClick={() => router.push(`/applicant/${applicantId}/details`)}
-              sx={{
-                bgcolor: 'white',
-                color: '#667eea',
-                fontWeight: 600,
-                px: 3,
-                '&:hover': {
-                  bgcolor: 'rgba(255, 255, 255, 0.9)',
-                  transform: 'translateY(-2px)',
-                  boxShadow: 3,
-                },
-                transition: 'all 0.2s',
-              }}
-            >
-              View Details
-            </Button>
-          </Box>
-        </CardContent>
-      </Card>
+      {/* Rejection Reason (if rejected) */}
+      {applicant.status === 'rejected' && (applicant as any)?.rejectionReason && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight={600}>Rejection Reason:</Typography>
+          <Typography variant="body2">{(applicant as any).rejectionReason}</Typography>
+        </Alert>
+      )}
 
-      <Grid container spacing={3}>
-        {/* Applicant Info */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <Person color="primary" />
-                <Typography variant="h6" fontWeight={600}>
-                  Personal Information
-                </Typography>
-              </Box>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    Email
-                  </Typography>
-                  <Typography variant="body2">{applicant.email}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    Phone
-                  </Typography>
-                  <Typography variant="body2">{applicant.phone}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    Age
-                  </Typography>
-                  <Typography variant="body2">{applicant.age} years</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    Gender
-                  </Typography>
-                  <Typography variant="body2">
-                    {applicant.gender === 'M' ? 'Male' : applicant.gender === 'F' ? 'Female' : 'Other'}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    Marital Status
-                  </Typography>
-                  <Typography variant="body2">{applicant.maritalStatus}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    Dependents
-                  </Typography>
-                  <Typography variant="body2">{applicant.dependents}</Typography>
-                </Grid>
+      {/* Main Tabs */}
+      <Paper>
+        <Tabs
+          value={activeTab}
+          onChange={(_e, newValue) => setActiveTab(newValue)}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            borderBottom: 1,
+            borderColor: 'divider',
+            px: 2,
+          }}
+        >
+          <Tab icon={<Person />} iconPosition="start" label="Overview" />
+          <Tab icon={<Assessment />} iconPosition="start" label="Risk Assessment" />
+          <Tab icon={<Psychology />} iconPosition="start" label="Reasoning" />
+          <Tab icon={<Lightbulb />} iconPosition="start" label="Suggestions" />
+          <Tab icon={<AccountBalance />} iconPosition="start" label="Repayment History" />
+          <Tab icon={<CreditScoreIcon />} iconPosition="start" label="Credit History" />
+          <Tab icon={<Receipt />} iconPosition="start" label="Transactions" />
+          <Tab icon={<History />} iconPosition="start" label="Audit Trail" />
+        </Tabs>
+
+        <Box sx={{ px: 3 }}>
+          {/* Tab 0: Overview */}
+          <TabPanel value={activeTab} index={0}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Typography variant="h6" gutterBottom fontWeight={600}>
+                      Personal Information
+                    </Typography>
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Email</Typography>
+                        <Typography variant="body2">{applicant.email}</Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Phone</Typography>
+                        <Typography variant="body2">{applicant.phone}</Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Date of Birth</Typography>
+                        <Typography variant="body2">
+                          {applicant.dateOfBirth ? new Date(applicant.dateOfBirth).toLocaleDateString() : 'N/A'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Age</Typography>
+                        <Typography variant="body2">{applicant.age ?? 'N/A'} years</Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Gender</Typography>
+                        <Typography variant="body2">
+                          {applicant.gender === 'M' ? 'Male' : applicant.gender === 'F' ? 'Female' : applicant.gender || 'N/A'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Marital Status</Typography>
+                        <Typography variant="body2">{applicant.maritalStatus ?? 'N/A'}</Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Dependents</Typography>
+                        <Typography variant="body2">{applicant.dependents ?? 'N/A'}</Typography>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
               </Grid>
-            </CardContent>
-          </Card>
-        </Grid>
 
-        {/* Financial Info */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <AttachMoney color="primary" />
-                <Typography variant="h6" fontWeight={600}>
-                  Financial Information
-                </Typography>
-              </Box>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    Annual Income
-                  </Typography>
-                  <Typography variant="body2">{formatCurrency(applicant.annualIncome ?? 0)}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    Credit Score
-                  </Typography>
-                  <Typography variant="body2" fontWeight={600}>
-                    {applicant.creditScore}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    Employment Type
-                  </Typography>
-                  <Typography variant="body2">{applicant.employmentType}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    Employment Length
-                  </Typography>
-                  <Typography variant="body2">{applicant.employmentLength} years</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    Loan Amount
-                  </Typography>
-                  <Typography variant="body2">{formatCurrency(applicant.loanAmount)}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    Loan Purpose
-                  </Typography>
-                  <Typography variant="body2">{applicant.loanPurpose}</Typography>
-                </Grid>
+              <Grid item xs={12} md={6}>
+                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Typography variant="h6" gutterBottom fontWeight={600}>
+                      Employment & Income
+                    </Typography>
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Employment Type</Typography>
+                        <Typography variant="body2">{applicant.employmentType ?? 'N/A'}</Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Employment Length</Typography>
+                        <Typography variant="body2">{applicant.employmentLength ?? 'N/A'} years</Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Monthly Income</Typography>
+                        <Typography variant="body2" fontWeight={600}>
+                          {formatCurrency(
+                            (applicant as any).monthlyIncome ?? 
+                            (applicant.annualIncome ? applicant.annualIncome / 12 : 0)
+                          )}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Annual Income</Typography>
+                        <Typography variant="body2" fontWeight={600}>
+                          {formatCurrency(
+                            applicant.annualIncome ?? 
+                            ((applicant as any).monthlyIncome ? (applicant as any).monthlyIncome * 12 : 0)
+                          )}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Credit Score</Typography>
+                        <Typography variant="body2" fontWeight={600}>
+                          {applicant.creditScore ?? 'N/A'}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
               </Grid>
-            </CardContent>
-          </Card>
-        </Grid>
 
-        {/* Tabbed Interface for Risk Analysis */}
-        <Grid item xs={12}>
-          <Paper>
-            <Tabs
-              value={activeTab}
-              onChange={(_e, newValue) => setActiveTab(newValue)}
-              variant="scrollable"
-              scrollButtons="auto"
-              sx={{
-                borderBottom: 1,
-                borderColor: 'divider',
-                px: 2,
-              }}
-            >
-              <Tab icon={<Assessment />} iconPosition="start" label="Risk Assessment" />
-              <Tab icon={<Psychology />} iconPosition="start" label="Reasoning" />
-              <Tab icon={<Lightbulb />} iconPosition="start" label="Suggestions" />
-            </Tabs>
+              <Grid item xs={12}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom fontWeight={600}>
+                      Loan Details
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="caption" color="text.secondary">Loan Purpose</Typography>
+                        <Typography variant="body2">{applicant.loanPurpose ?? 'N/A'}</Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="caption" color="text.secondary">Loan Term</Typography>
+                        <Typography variant="body2">
+                          {(applicant as any).loanTermMonths ?? applicant.loanTerm ?? 0} months
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="caption" color="text.secondary">Total Payable</Typography>
+                        <Typography variant="body2" fontWeight={600}>
+                          {formatCurrency(loanDetails?.totalPayable ?? 0)}
+                        </Typography>
+                      </Grid>
+                      {loanDetails?.disbursementDate && (
+                        <Grid item xs={12} sm={6} md={4}>
+                          <Typography variant="caption" color="text.secondary">Disbursement Date</Typography>
+                          <Typography variant="body2">
+                            {new Date(loanDetails.disbursementDate).toLocaleDateString()}
+                          </Typography>
+                        </Grid>
+                      )}
+                      {loanDetails?.maturityDate && (
+                        <Grid item xs={12} sm={6} md={4}>
+                          <Typography variant="caption" color="text.secondary">Maturity Date</Typography>
+                          <Typography variant="body2">
+                            {new Date(loanDetails.maturityDate).toLocaleDateString()}
+                          </Typography>
+                        </Grid>
+                      )}
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          </TabPanel>
 
-            <Box sx={{ p: 3 }}>
-              {/* Tab 1: Risk Assessment */}
-              {activeTab === 0 && (
-                <RiskAssessment
-                  riskScore={prediction.riskScore}
-                  riskLevel={riskLevel as 'LOW' | 'MEDIUM' | 'HIGH'}
-                  confidence={prediction.confidence}
-                  decision={prediction.decision}
-                />
-              )}
+          {/* Tab 1: Risk Assessment */}
+          <TabPanel value={activeTab} index={1}>
+            <RiskAssessment
+              riskScore={prediction.riskScore}
+              riskLevel={riskLevel as 'LOW' | 'MEDIUM' | 'HIGH'}
+              confidence={prediction.confidence}
+              decision={prediction.decision}
+            />
+          </TabPanel>
 
-              {/* Tab 2: Reasoning */}
-              {activeTab === 1 && (
-                <BayesianReasoning
-                  bayesianNetwork={prediction.bayesianNetwork}
-                  decision={prediction.decision}
-                  riskScore={prediction.riskScore}
-                />
-              )}
+          {/* Tab 2: Reasoning */}
+          <TabPanel value={activeTab} index={2}>
+            <BayesianReasoning
+              bayesianNetwork={prediction.bayesianNetwork}
+              decision={prediction.decision}
+              riskScore={prediction.riskScore}
+            />
+          </TabPanel>
 
-              {/* Tab 3: Suggestions */}
-              {activeTab === 2 && (
-                <MitigationSuggestions
-                  riskScore={prediction.riskScore}
-                  decision={prediction.decision}
-                  creditScore={applicant.creditScore}
-                  debtToIncomeRatio={0.28}
-                  employmentLength={applicant.employmentLength}
-                  businessRules={prediction.businessRules}
-                />
-              )}
+          {/* Tab 3: Suggestions */}
+          <TabPanel value={activeTab} index={3}>
+            <MitigationSuggestions
+              riskScore={prediction.riskScore}
+              decision={prediction.decision}
+              creditScore={applicant.creditScore}
+              debtToIncomeRatio={0.28}
+              employmentLength={applicant.employmentLength}
+              businessRules={prediction.businessRules}
+            />
+          </TabPanel>
+
+          {/* Tab 4: Repayment History */}
+          <TabPanel value={activeTab} index={4}>
+            {isLoadingRepayment ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : repaymentHistory ? (
+              <RepaymentHistory
+                schedule={repaymentHistory.schedule}
+                summary={repaymentHistory.summary}
+              />
+            ) : (
+              <Alert severity="info">No repayment history available for this applicant.</Alert>
+            )}
+          </TabPanel>
+
+          {/* Tab 5: Credit History */}
+          <TabPanel value={activeTab} index={5}>
+            {isLoadingCredit ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : creditHistory ? (
+              <CreditHistory creditProfile={creditHistory} />
+            ) : (
+              <Alert severity="info">No credit history available for this applicant.</Alert>
+            )}
+          </TabPanel>
+
+          {/* Tab 6: Transactions */}
+          <TabPanel value={activeTab} index={6}>
+            {isLoadingTransactions ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : transactionHistory?.transactions && transactionHistory.transactions.length > 0 ? (
+              <TransactionList transactions={transactionHistory.transactions} />
+            ) : (
+              <Alert severity="info">No transaction history available for this applicant.</Alert>
+            )}
+          </TabPanel>
+
+          {/* Tab 7: Audit Trail */}
+          <TabPanel value={activeTab} index={7}>
+            {isLoadingAudit ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : auditLog && auditLog.length > 0 ? (
+              <AuditTrail auditLog={auditLog} />
+            ) : (
+              <Alert severity="info">No audit trail available for this applicant.</Alert>
+            )}
+          </TabPanel>
+        </Box>
+      </Paper>
+
+      {/* Manager Actions */}
+      {isManager() && applicant.status === 'pending' && (
+        <Card sx={{ mt: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom fontWeight={600}>
+              Loan Decision
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              As a Bank Manager, you can approve or reject this loan application.
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<CheckCircle />}
+                onClick={() => setApproveDialogOpen(true)}
+                disabled={approveLoan.isPending}
+              >
+                Approve Loan
+              </Button>
+              <Button
+                variant="contained"
+                color="error"
+                startIcon={<Cancel />}
+                onClick={() => setRejectDialogOpen(true)}
+                disabled={rejectLoan.isPending}
+              >
+                Reject Loan
+              </Button>
             </Box>
-          </Paper>
-        </Grid>
-
-        {/* Manager Actions */}
-        {isManager() && applicant.status === 'pending' && (
-          <Grid item xs={12}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom fontWeight={600}>
-                  Loan Decision
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  As a Bank Manager, you can approve or reject this loan application.
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  <Button
-                    variant="contained"
-                    color="success"
-                    startIcon={<CheckCircle />}
-                    onClick={() => setApproveDialogOpen(true)}
-                    disabled={approveLoan.isPending}
-                  >
-                    Approve Loan
-                  </Button>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    startIcon={<Cancel />}
-                    onClick={() => setRejectDialogOpen(true)}
-                    disabled={rejectLoan.isPending}
-                  >
-                    Reject Loan
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
-      </Grid>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Approve Dialog */}
       <Dialog open={approveDialogOpen} onClose={() => setApproveDialogOpen(false)}>

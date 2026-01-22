@@ -100,9 +100,11 @@ export const applicantService = {
   getApplicant: async (id: string): Promise<ApiResponse<Applicant>> => {
     try {
       const response = await apiClient.get(`/api/applicants/${id}`);
+      // Backend returns { success: true, data: {...} }, so we need to extract response.data.data
+      const rawData = response.data?.data || response.data;
       return {
         success: true,
-        data: toCamelCase(response.data),
+        data: toCamelCase(rawData),
       };
     } catch (error) {
       return {
@@ -118,10 +120,12 @@ export const applicantService = {
   createApplicant: async (data: ApplicantFormData): Promise<ApiResponse<Applicant>> => {
     try {
       const response = await apiClient.post('/api/applicants', toSnakeCase(data));
+      // Backend returns { success: true, data: {...} }, so we need to extract response.data.data
+      const rawData = response.data?.data || response.data;
       return {
         success: true,
-        data: toCamelCase(response.data),
-        message: 'Applicant created successfully',
+        data: toCamelCase(rawData),
+        message: response.data?.message || 'Applicant created successfully',
       };
     } catch (error) {
       return {
@@ -140,10 +144,12 @@ export const applicantService = {
   ): Promise<ApiResponse<Applicant>> => {
     try {
       const response = await apiClient.put(`/api/applicants/${id}`, toSnakeCase(data));
+      // Backend returns { success: true, data: {...} }, so we need to extract response.data.data
+      const rawData = response.data?.data || response.data;
       return {
         success: true,
-        data: toCamelCase(response.data),
-        message: 'Applicant updated successfully',
+        data: toCamelCase(rawData),
+        message: response.data?.message || 'Applicant updated successfully',
       };
     } catch (error) {
       return {
@@ -294,9 +300,11 @@ export const applicantService = {
   getLoanDetails: async (applicantId: string): Promise<ApiResponse<LoanApplicationDetails>> => {
     try {
       const response = await apiClient.get(`/api/loan-details/${applicantId}`);
+      // Backend returns { success: true, data: {...} }, so we need to extract response.data.data
+      const rawData = response.data?.data || response.data;
       return {
         success: true,
-        data: toCamelCase(response.data),
+        data: toCamelCase(rawData),
       };
     } catch (error) {
       return {
