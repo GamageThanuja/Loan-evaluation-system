@@ -19,7 +19,7 @@ import {
   Divider,
   Autocomplete,
 } from '@mui/material';
-import { Save, ArrowBack, ArrowForward, Check, Person, ContactPhone, AttachMoney, AccountBalance } from '@mui/icons-material';
+import { Save, ArrowForward, Check, Person, ContactPhone, AttachMoney, AccountBalance } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 
@@ -296,9 +296,6 @@ export default function NewApplicantPage() {
     }
   };
 
-  const handleBack = () => {
-    setActiveStep((prev) => prev - 1);
-  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -344,7 +341,6 @@ export default function NewApplicantPage() {
         job_title: formData.jobTitle?.trim() || null,
         employment_length: formData.employmentLength,
         monthly_income: formData.monthlyIncome,
-        // Loan details
         loan_amount: formData.loanAmount,
         loan_purpose: formData.loanPurpose,
         loan_term_months: formData.loanTermMonths,
@@ -861,9 +857,6 @@ export default function NewApplicantPage() {
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
-        <Button startIcon={<ArrowBack />} onClick={() => router.back()} sx={{ mb: 2 }}>
-          Back
-        </Button>
         <Typography variant="h4" gutterBottom fontWeight={700}>
           New Applicant
         </Typography>
@@ -893,14 +886,7 @@ export default function NewApplicantPage() {
       <Paper component="form" onSubmit={handleSubmit} sx={{ p: 4 }}>
         {renderStepContent(activeStep)}
 
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, pt: 3, borderTop: 1, borderColor: 'divider' }}>
-          <Button
-            onClick={handleBack}
-            disabled={activeStep === 0 || isSubmitting}
-            startIcon={<ArrowBack />}
-          >
-            Back
-          </Button>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4, pt: 3, borderTop: 1, borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', gap: 2 }}>
             {activeStep === steps.length - 1 ? (
               <Button

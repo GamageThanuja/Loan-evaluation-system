@@ -38,11 +38,12 @@ import {
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { useApplicants, applicantKeys } from '@/hooks/useApplicants';
+import { useStatusUtils } from '@/hooks/useStatusUtils';
 import { TableSkeleton } from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/common/EmptyState';
 import predictionService from '@/services/prediction';
 import { useQueryClient } from '@tanstack/react-query';
-import { Applicant, EligibilityResult } from '@/types';
+import { EligibilityResult } from '@/types';
 
 export default function ApplicantListPage() {
   const router = useRouter();
@@ -52,6 +53,10 @@ export default function ApplicantListPage() {
 
   const { data, isLoading } = useApplicants(page + 1, rowsPerPage, search);
   const queryClient = useQueryClient();
+  const statusUtils = useStatusUtils();
+  
+  // Wait for status data to load before rendering chips with colors
+  const isStatusDataReady = !statusUtils.isLoading;
 
   // Popover state
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
@@ -141,59 +146,86 @@ export default function ApplicantListPage() {
     router.push(`/applicant/${applicantId}`);
   };
 
-  const getStatusChip = (status: string) => {
-    switch (status?.toLowerCase()) {
+  const getStatusIcon = (statusCode: string) => {
+    switch (statusCode?.toLowerCase()) {
       case 'approved':
-        return (
-          <Chip
-            label="Approved"
-            size="small"
-            color="success"
-            icon={<CheckCircle />}
-          />
-        );
+        return <CheckCircle />;
       case 'rejected':
-        return (
-          <Chip
-            label="Rejected"
-            size="small"
-            color="error"
-            icon={<Cancel />}
-          />
-        );
+        return <Cancel />;
       case 'under_review':
-        return (
-          <Chip
-            label="Under Review"
-            size="small"
-            color="info"
-            icon={<RateReview />}
-          />
-        );
+        return <RateReview />;
       case 'pending':
       default:
-        return (
-          <Chip
-            label="Pending"
-            size="small"
-            color="warning"
-            icon={<HourglassEmpty />}
-          />
-        );
+        return <HourglassEmpty />;
     }
   };
 
-  const getEligibilityChip = (eligibilityStatus: string | null | undefined) => {
-    if (!eligibilityStatus) return <Chip label="Not Checked" size="small" variant="outlined" />;
+  const getStatusChip = (status: string) => {
+    const statusInfo = statusUtils.getApplicationStatus(status);
+    const statusName = statusInfo?.name || statusUtils.getStatusName(status);
+    const statusCode = statusInfo?.code || status?.toLowerCase() || 'pending';
+    const colorCode = statusInfo?.colorCode;
 
-    switch (eligibilityStatus.toLowerCase()) {
-      case 'eligible':
-        return <Chip label="Eligible" size="small" color="success" variant="outlined" />;
-      case 'not_eligible':
-        return <Chip label="Not Eligible" size="small" color="error" variant="outlined" />;
-      default:
-        return <Chip label="Pending" size="small" variant="outlined" />;
+    // If we have a color code from API and data is ready, use it directly
+    if (isStatusDataReady && colorCode) {
+      return (
+        <Chip
+          label={statusName}
+          size="small"
+          icon={getStatusIcon(statusCode)}
+          sx={{
+            bgcolor: `${colorCode}20`,
+            color: colorCode,
+            border: `1px solid ${colorCode}40`,
+            fontWeight: 600,
+            '& .MuiChip-icon': {
+              color: colorCode,
+            },
+          }}
+        />
+      );
     }
+
+    // Fallback to Material-UI theme colors (while loading or if no color code)
+    const statusColor = statusUtils.getStatusColorName(status);
+    return (
+      <Chip
+        label={statusName}
+        size="small"
+        color={statusColor}
+        icon={getStatusIcon(statusCode)}
+      />
+    );
+  };
+
+  const getEligibilityChip = (eligibilityStatus: string | null | undefined) => {
+    if (!eligibilityStatus) {
+      const notCheckedStatus = statusUtils.getEligibilityStatus('not_checked');
+      return (
+        <Chip 
+          label={notCheckedStatus?.name || 'Not Checked'} 
+          size="small" 
+          variant="outlined" 
+        />
+      );
+    }
+
+    const eligibilityInfo = statusUtils.getEligibilityStatus(eligibilityStatus);
+    const eligibilityName = eligibilityInfo?.name || statusUtils.getEligibilityName(eligibilityStatus);
+    
+    // Map eligibility to color
+    let color: 'success' | 'error' | 'default' = 'default';
+    if (eligibilityInfo?.code === 'eligible') color = 'success';
+    else if (eligibilityInfo?.code === 'not_eligible') color = 'error';
+
+    return (
+      <Chip 
+        label={eligibilityName} 
+        size="small" 
+        color={color}
+        variant="outlined" 
+      />
+    );
   };
 
   const formatCurrency = (value: number) => {
@@ -229,9 +261,6 @@ export default function ApplicantListPage() {
         <Box>
           <Typography variant="h4" gutterBottom fontWeight={700}>
             All Applicants
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            View and manage all loan applications
           </Typography>
         </Box>
         <Button

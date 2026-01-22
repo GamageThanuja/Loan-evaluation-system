@@ -26,13 +26,24 @@ import {
   PictureAsPdfRounded as PdfIcon
 } from '@mui/icons-material';
 import { useApplicants } from '@/hooks/useApplicants';
+import { useStatusUtils } from '@/hooks/useStatusUtils';
 import { TableSkeleton } from '@/components/ui/LoadingSkeleton';
 import axios from 'axios';
+import {
+  CheckCircle,
+  Cancel,
+  HourglassEmpty,
+  RateReview,
+} from '@mui/icons-material';
 
 export default function ReportsPage() {
   const [page] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
+  const statusUtils = useStatusUtils();
+  
+  // Wait for status data to load before rendering chips with colors
+  const isStatusDataReady = !statusUtils.isLoading;
 
   // Fetch ONLY not-eligible (+ rejected) applicants (eligibilityStatus = 0)
   const {
@@ -41,6 +52,88 @@ export default function ReportsPage() {
     error,
     refetch
   } = useApplicants(page, 10, searchTerm, undefined, 0);
+
+  const getStatusIcon = (statusCode: string) => {
+    switch (statusCode?.toLowerCase()) {
+      case 'approved':
+        return <CheckCircle />;
+      case 'rejected':
+        return <Cancel />;
+      case 'under_review':
+        return <RateReview />;
+      case 'pending':
+      default:
+        return <HourglassEmpty />;
+    }
+  };
+
+  const getStatusChip = (status: string) => {
+    const statusInfo = statusUtils.getApplicationStatus(status);
+    const statusName = statusInfo?.name || statusUtils.getStatusName(status);
+    const statusCode = statusInfo?.code || status?.toLowerCase() || 'pending';
+    const colorCode = statusInfo?.colorCode;
+
+    // If we have a color code from API and data is ready, use it directly
+    if (isStatusDataReady && colorCode) {
+      return (
+        <Chip
+          label={statusName}
+          size="small"
+          icon={getStatusIcon(statusCode)}
+          sx={{
+            bgcolor: `${colorCode}20`,
+            color: colorCode,
+            border: `1px solid ${colorCode}40`,
+            fontWeight: 600,
+            '& .MuiChip-icon': {
+              color: colorCode,
+            },
+          }}
+        />
+      );
+    }
+
+    // Fallback to Material-UI theme colors (while loading or if no color code)
+    const statusColor = statusUtils.getStatusColorName(status);
+    return (
+      <Chip
+        label={statusName}
+        size="small"
+        color={statusColor}
+        icon={getStatusIcon(statusCode)}
+      />
+    );
+  };
+
+  const getEligibilityChip = (eligibilityStatus: string | null | undefined) => {
+    if (!eligibilityStatus) {
+      const notCheckedStatus = statusUtils.getEligibilityStatus('not_checked');
+      return (
+        <Chip 
+          label={notCheckedStatus?.name || 'Not Checked'} 
+          size="small" 
+          variant="outlined" 
+        />
+      );
+    }
+
+    const eligibilityInfo = statusUtils.getEligibilityStatus(eligibilityStatus);
+    const eligibilityName = eligibilityInfo?.name || statusUtils.getEligibilityName(eligibilityStatus);
+    
+    // Map eligibility to color
+    let color: 'success' | 'error' | 'default' = 'default';
+    if (eligibilityInfo?.code === 'eligible') color = 'success';
+    else if (eligibilityInfo?.code === 'not_eligible') color = 'error';
+
+    return (
+      <Chip 
+        label={eligibilityName} 
+        size="small" 
+        color={color}
+        variant="outlined" 
+      />
+    );
+  };
 
   const handleGenerateReport = async (applicantId: number) => {
     try {
@@ -181,21 +274,8 @@ export default function ReportsPage() {
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          {/* Display detailed status logic */}
-                          {applicant.status === 'rejected' ? (
-                            <Chip
-                              label="Rejected"
-                              color="error"
-                              size="small"
-                            />
-                          ) : (
-                            <Chip
-                              label="Not Eligible"
-                              color="warning"
-                              size="small"
-                              variant="outlined"
-                            />
-                          )}
+                          {/* Display status using API color codes */}
+                          {getStatusChip(applicant.status || 'pending')}
                         </TableCell>
                         <TableCell>
                           {/* Show Credit Score if available, else generic risk indicator */}

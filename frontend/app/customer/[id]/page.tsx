@@ -23,7 +23,6 @@ import {
   Divider,
 } from '@mui/material';
 import {
-  ArrowBack,
   Person,
   Phone,
   Work,
@@ -205,9 +204,6 @@ export default function CustomerProfilePage() {
     <Box>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Button startIcon={<ArrowBack />} onClick={() => router.back()} sx={{ mb: 2 }}>
-          Back
-        </Button>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
             <Avatar

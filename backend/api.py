@@ -43,6 +43,7 @@ from routers import auth as auth_module
 from routers import loan_details as loan_details_module
 from routers import applicants as applicants_module
 from routers import predictions as predictions_module
+from routers import status_management as status_management_module
 
 # Setup logging
 setup_logging(
@@ -122,6 +123,9 @@ app.include_router(applicants_module.router)
 
 # Mount predictions router (ML model predictions with reasoning)
 app.include_router(predictions_module.router)
+
+# Mount status management router (Eligibility, Application Status, Status Colors)
+app.include_router(status_management_module.router)
 
 # ============================================
 # DASHBOARD ENDPOINTS

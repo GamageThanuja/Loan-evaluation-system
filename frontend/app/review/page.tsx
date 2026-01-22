@@ -40,6 +40,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '@/hooks/useAuth';
 import { useApplicants, useApproveApplication, useRejectApplication, applicantKeys } from '@/hooks/useApplicants';
+import { useStatusUtils } from '@/hooks/useStatusUtils';
 import { useQueryClient } from '@tanstack/react-query';
 import { TableSkeleton } from '@/components/ui/LoadingSkeleton';
 import { Applicant } from '@/types';
@@ -47,6 +48,10 @@ import { Applicant } from '@/types';
 export default function ReviewPage() {
   const { isManager } = useAuth();
   const queryClient = useQueryClient();
+  const statusUtils = useStatusUtils();
+  
+  // Wait for status data to load before rendering chips with colors
+  const isStatusDataReady = !statusUtils.isLoading;
   const [activeTab, setActiveTab] = useState(0);
 
   // API Hooks
@@ -144,19 +149,56 @@ export default function ReviewPage() {
     }
   };
 
-  const getStatusChip = (status: string) => {
-    switch (status?.toLowerCase()) {
+  const getStatusIcon = (statusCode: string) => {
+    switch (statusCode?.toLowerCase()) {
       case 'approved':
-        return <Chip label="Approved" color="success" size="small" icon={<CheckCircle />} />;
+        return <CheckCircle />;
       case 'rejected':
-        return <Chip label="Rejected" color="error" size="small" icon={<Cancel />} />;
+        return <Cancel />;
       case 'under_review':
-        return <Chip label="Under Review" color="info" size="small" icon={<Schedule />} />;
+        return <Schedule />;
       case 'pending':
-        return <Chip label="Pending" color="warning" size="small" icon={<Schedule />} />;
       default:
-        return <Chip label={status || 'Unknown'} size="small" />;
+        return <Schedule />;
     }
+  };
+
+  const getStatusChip = (status: string) => {
+    const statusInfo = statusUtils.getApplicationStatus(status);
+    const statusName = statusInfo?.name || statusUtils.getStatusName(status);
+    const statusCode = statusInfo?.code || status?.toLowerCase() || 'pending';
+    const colorCode = statusInfo?.colorCode;
+
+    // If we have a color code from API and data is ready, use it directly
+    if (isStatusDataReady && colorCode) {
+      return (
+        <Chip
+          label={statusName}
+          size="small"
+          icon={getStatusIcon(statusCode)}
+          sx={{
+            bgcolor: `${colorCode}20`,
+            color: colorCode,
+            border: `1px solid ${colorCode}40`,
+            fontWeight: 600,
+            '& .MuiChip-icon': {
+              color: colorCode,
+            },
+          }}
+        />
+      );
+    }
+
+    // Fallback to Material-UI theme colors (while loading or if no color code)
+    const statusColor = statusUtils.getStatusColorName(status);
+    return (
+      <Chip
+        label={statusName}
+        size="small"
+        color={statusColor}
+        icon={getStatusIcon(statusCode)}
+      />
+    );
   };
 
   const renderReviewTable = (reviewList: Applicant[]) => (
