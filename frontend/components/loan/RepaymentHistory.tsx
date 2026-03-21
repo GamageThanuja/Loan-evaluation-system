@@ -120,10 +120,10 @@ export default function RepaymentHistory({ schedule, summary }: RepaymentHistory
         return (
             <Box sx={{ textAlign: 'center', py: 4 }}>
                 <Typography variant="h6" color="text.secondary" gutterBottom>
-                    No Repayment History Available
+                    No Previous Loans
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                    Repayment information will appear here once the loan is disbursed.
+                    This applicant has no loan repayment history. Repayment information will appear here once a loan is disbursed.
                 </Typography>
             </Box>
         );

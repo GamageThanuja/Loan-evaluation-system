@@ -1,83 +1,101 @@
 #!/bin/bash
-
-# Loan Evaluation System - Stop All Services
-# This script stops backend API, frontend, and ML services
-
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_DIR="$PROJECT_ROOT/logs"
+# =============================================================================
+# LoanWise Application Stop Script
+# Stops both backend and frontend servers
+# =============================================================================
 
 # Colors for output
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${RED}================================${NC}"
-echo -e "${RED}Stopping Loan Evaluation System${NC}"
-echo -e "${RED}================================${NC}"
+# Project root
+PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 
-# Function to stop process by PID file
-stop_service() {
-    local service_name=$1
-    local pid_file=$2
-    
-    if [ -f "$pid_file" ]; then
-        PID=$(cat "$pid_file")
-        if ps -p $PID > /dev/null 2>&1; then
-            echo -e "${YELLOW}Stopping $service_name (PID: $PID)...${NC}"
-            kill $PID 2>/dev/null || kill -9 $PID 2>/dev/null
-            rm -f "$pid_file"
-            echo -e "${GREEN}✓ $service_name stopped${NC}"
-        else
-            echo -e "${YELLOW}$service_name is not running${NC}"
-            rm -f "$pid_file"
-        fi
-    else
-        echo -e "${YELLOW}No PID file found for $service_name${NC}"
-    fi
-}
+echo -e "${BLUE}=============================================================================${NC}"
+echo -e "${BLUE}                   LoanWise - Stopping Application                          ${NC}"
+echo -e "${BLUE}=============================================================================${NC}"
+echo ""
 
-# Function to kill process by port
-kill_port() {
-    local port=$1
-    local service_name=$2
-    
-    if lsof -ti:$port > /dev/null 2>&1; then
-        echo -e "${YELLOW}Killing process on port $port ($service_name)...${NC}"
-        lsof -ti:$port | xargs kill -9 2>/dev/null || true
-        echo -e "${GREEN}✓ Stopped process on port $port${NC}"
-    fi
-}
-
+# =============================================================================
 # Stop Backend
-echo -e "\n${YELLOW}[1/2] Stopping Backend API Server...${NC}"
-stop_service "Backend" "$LOG_DIR/backend.pid"
-kill_port 8000 "Backend API"
+# =============================================================================
 
-# Stop Frontend
-echo -e "\n${YELLOW}[2/2] Stopping Frontend Server...${NC}"
-stop_service "Frontend" "$LOG_DIR/frontend.pid"
-kill_port 3000 "Frontend"
+echo -e "${YELLOW}🛑 Stopping Backend...${NC}"
 
-# Kill any remaining Node.js processes from Next.js
-pkill -f "next dev" 2>/dev/null || true
-pkill -f "next-server" 2>/dev/null || true
-
-# Kill any remaining Python API processes
-pkill -f "api.py" 2>/dev/null || true
-pkill -f "uvicorn" 2>/dev/null || true
-
-# Summary
-echo -e "\n${GREEN}================================${NC}"
-echo -e "${GREEN}All Services Stopped Successfully!${NC}"
-echo -e "${GREEN}================================${NC}"
-
-# Cleanup log files (optional)
-read -p "Do you want to clear log files? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    rm -f "$LOG_DIR"/*.log
-    echo -e "${GREEN}✓ Log files cleared${NC}"
+# Try to stop using PID file
+if [ -f "$PROJECT_ROOT/logs/backend.pid" ]; then
+    BACKEND_PID=$(cat "$PROJECT_ROOT/logs/backend.pid")
+    if ps -p $BACKEND_PID > /dev/null 2>&1; then
+        kill $BACKEND_PID 2>/dev/null
+        echo -e "${GREEN}✅ Backend stopped (PID: $BACKEND_PID)${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Backend PID not found${NC}"
+    fi
+    rm -f "$PROJECT_ROOT/logs/backend.pid"
 fi
 
-echo -e "${YELLOW}To start all services again, run:${NC} ./start.sh\n"
+# Kill any process on port 8000
+if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo -e "${YELLOW}🔧 Killing process on port 8000...${NC}"
+    lsof -ti:8000 | xargs kill -9 2>/dev/null
+    echo -e "${GREEN}✅ Port 8000 freed${NC}"
+fi
+
+# =============================================================================
+# Stop Frontend
+# =============================================================================
+
+echo -e "\n${YELLOW}🛑 Stopping Frontend...${NC}"
+
+# Try to stop using PID file
+if [ -f "$PROJECT_ROOT/logs/frontend.pid" ]; then
+    FRONTEND_PID=$(cat "$PROJECT_ROOT/logs/frontend.pid")
+    if ps -p $FRONTEND_PID > /dev/null 2>&1; then
+        kill $FRONTEND_PID 2>/dev/null
+        echo -e "${GREEN}✅ Frontend stopped (PID: $FRONTEND_PID)${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Frontend PID not found${NC}"
+    fi
+    rm -f "$PROJECT_ROOT/logs/frontend.pid"
+fi
+
+# Kill any process on port 3000
+if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo -e "${YELLOW}🔧 Killing process on port 3000...${NC}"
+    lsof -ti:3000 | xargs kill -9 2>/dev/null
+    echo -e "${GREEN}✅ Port 3000 freed${NC}"
+fi
+
+# =============================================================================
+# Cleanup
+# =============================================================================
+
+echo -e "\n${YELLOW}🧹 Cleaning up...${NC}"
+
+# Wait for processes to terminate
+sleep 2
+
+# Check if ports are really free
+BACKEND_RUNNING=$(lsof -Pi :8000 -sTCP:LISTEN -t 2>/dev/null | wc -l | tr -d ' ')
+FRONTEND_RUNNING=$(lsof -Pi :3000 -sTCP:LISTEN -t 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "$BACKEND_RUNNING" -eq "0" ] && [ "$FRONTEND_RUNNING" -eq "0" ]; then
+    echo -e "${GREEN}✅ All services stopped successfully${NC}"
+else
+    if [ "$BACKEND_RUNNING" -ne "0" ]; then
+        echo -e "${RED}❌ Backend still running on port 8000${NC}"
+    fi
+    if [ "$FRONTEND_RUNNING" -ne "0" ]; then
+        echo -e "${RED}❌ Frontend still running on port 3000${NC}"
+    fi
+    echo -e "${YELLOW}⚠️  Try running the script again or manually kill processes${NC}"
+fi
+
+echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}                         Application Stopped                               ${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""

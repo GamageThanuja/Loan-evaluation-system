@@ -65,8 +65,9 @@ class ApplicantBase(BaseModel):
     @validator("nic")
     def validate_nic(cls, value: str) -> str:
         normalized = str(value).strip().upper()
-        if not re.match(r"^\d{9}[VX]$", normalized):
-            raise ValueError("NIC must be in format YYDDDXXXXV")
+        # Accept both old format (9 chars: YYDDDXXXXV) and new format (12 digits)
+        if not re.match(r"^(\d{9}[VX]|\d{12})$", normalized):
+            raise ValueError("NIC must be in old format (YYDDDXXXXV) or new format (12 digits)")
         return normalized
 
 class ApplicantCreate(ApplicantBase):
@@ -101,14 +102,17 @@ class ApplicantUpdate(BaseModel):
     credit_score: Optional[int] = Field(None, ge=300, le=850)
     existing_loans: Optional[int] = Field(None, ge=0)
     monthly_expenses: Optional[float] = Field(None, ge=0)
+    eligibility_status: Optional[str] = Field(None, description="Eligibility status: eligible, not_eligible, pending")
+    status: Optional[str] = Field(None, description="Application status: pending, under_review, approved, rejected")
 
     @validator("nic")
     def validate_nic(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return value
         normalized = str(value).strip().upper()
-        if not re.match(r"^\d{9}[VX]$", normalized):
-            raise ValueError("NIC must be in format YYDDDXXXXV")
+        # Accept both old format (9 chars: YYDDDXXXXV) and new format (12 digits)
+        if not re.match(r"^(\d{9}[VX]|\d{12})$", normalized):
+            raise ValueError("NIC must be in old format (YYDDDXXXXV) or new format (12 digits)")
         return normalized
 
 class EligibilityRequest(BaseModel):

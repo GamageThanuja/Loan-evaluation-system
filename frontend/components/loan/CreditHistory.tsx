@@ -97,10 +97,10 @@ export default function CreditHistory({ creditProfile }: CreditHistoryProps) {
         return (
             <Box sx={{ textAlign: 'center', py: 4 }}>
                 <Typography variant="h6" color="text.secondary" gutterBottom>
-                    No Credit History Available
+                    No Previous Loans
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                    Credit information will appear here once available.
+                    This applicant has no credit history from previous loans. Credit information will appear here once available.
                 </Typography>
             </Box>
         );

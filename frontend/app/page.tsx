@@ -7,7 +7,6 @@ import {
   Typography,
   Box,
   Button,
-  LinearProgress,
   Chip,
   Paper,
   Table,
@@ -18,19 +17,30 @@ import {
   TableRow,
 } from '@mui/material';
 import {
+  AccountBalance,
   TrendingUp,
-  AssessmentOutlined,
+  Payments,
   PeopleOutline,
-  CheckCircleOutline,
   PersonAdd,
   Assessment,
+  AttachMoney,
+  CalendarMonth,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
-import { useModelStats, useModelHealth } from '@/hooks/useModel';
-import { useRecentPredictions } from '@/hooks/usePrediction';
-import { DashboardStatsSkeleton, TableSkeleton, CardSkeleton } from '@/components/ui/LoadingSkeleton';
-import { formatPercent, formatRelativeTime, getRiskLevel, getRiskColor } from '@/lib/utils';
+import { useFinancialStats, useMonthlyStats, useRecentApplications } from '@/hooks/useDashboard';
+import { DashboardStatsSkeleton, TableSkeleton } from '@/components/ui/LoadingSkeleton';
+import { formatRelativeTime, getRiskLevel, getRiskColor } from '@/lib/utils';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
+
+// Format currency in LKR
+function formatLKR(value: number): string {
+  if (value >= 1000000) {
+    return `LKR ${(value / 1000000).toFixed(2)}M`;
+  } else if (value >= 1000) {
+    return `LKR ${(value / 1000).toFixed(1)}K`;
+  }
+  return `LKR ${value.toLocaleString()}`;
+}
 
 function StatCard({
   title,
@@ -80,12 +90,25 @@ function StatCard({
 
 export default function Dashboard() {
   const router = useRouter();
-  const { data: stats, isLoading: statsLoading } = useModelStats();
-  const { data: health, isLoading: healthLoading } = useModelHealth();
-  const { data: recentPredictions, isLoading: predictionsLoading } = useRecentPredictions();
+  const { data: financialStats, isLoading: financialLoading, error: financialError } = useFinancialStats();
+  const { data: monthlyStats, isLoading: monthlyLoading } = useMonthlyStats();
+  const { data: recentApplications, isLoading: applicationsLoading } = useRecentApplications();
 
-  if (statsLoading) {
+  if (financialLoading) {
     return <DashboardStatsSkeleton />;
+  }
+
+  if (financialError) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Typography variant="h6" color="error" gutterBottom>
+          Error Loading Dashboard
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {financialError.message}
+        </Typography>
+      </Box>
+    );
   }
 
   return (
@@ -95,106 +118,89 @@ export default function Dashboard() {
           <Typography variant="h4" gutterBottom fontWeight={700}>
             Dashboard
           </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Welcome to the Home Credit Loan Approval System
-          </Typography>
+
         </Box>
 
-        {/* Stats Cards */}
+        {/* Financial Stats Cards */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
-              title="Model AUC"
-              value={stats ? formatPercent(stats.modelAUC, 2) : '-'}
-              icon={<TrendingUp />}
-              color="#2e7d32"
-              subtitle="Area Under Curve"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard
-              title="Accuracy"
-              value={stats ? formatPercent(stats.modelAccuracy, 2) : '-'}
-              icon={<AssessmentOutlined />}
+              title="Total Loans Disbursed"
+              value={financialStats?.totalLoansDisbursed?.toLocaleString() || '0'}
+              icon={<AccountBalance />}
               color="#1976d2"
-              subtitle="Model Performance"
+              subtitle="All time applications"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
-              title="Total Predictions"
-              value={stats ? stats.totalPredictions.toLocaleString() : '-'}
-              icon={<PeopleOutline />}
-              color="#f59e0b"
-              subtitle="All time"
+              title="Total Loan Amount"
+              value={formatLKR(financialStats?.totalLoanAmount || 0)}
+              icon={<AttachMoney />}
+              color="#2e7d32"
+              subtitle="Total amount disbursed"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <StatCard
+              title="Interest Earned"
+              value={formatLKR(financialStats?.totalInterestEarned || 0)}
+              icon={<TrendingUp />}
+              color="#ed6c02"
+              subtitle={`@ ${financialStats?.avgInterestRate || 12}% APR`}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
               title="Approval Rate"
-              value={stats ? formatPercent(stats.approvalRate, 1) : '-'}
-              icon={<CheckCircleOutline />}
-              color="#2e7d32"
-              subtitle={`${stats ? stats.pendingReviews : 0} pending`}
+              value={`${financialStats?.approvalRate?.toFixed(1) || '0.0'}%`}
+              icon={<Payments />}
+              color="#9c27b0"
+              subtitle={`${financialStats?.pendingReviews || 0} pending`}
             />
           </Grid>
         </Grid>
 
         <Grid container spacing={3}>
-          {/* Model Health */}
+          {/* Monthly Summary */}
           <Grid item xs={12} md={4}>
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom fontWeight={600}>
-                  Model Health
+                  <CalendarMonth sx={{ mr: 1, verticalAlign: 'middle', fontSize: 20 }} />
+                  {monthlyStats?.monthName || 'Monthly Summary'}
                 </Typography>
-                {healthLoading ? (
-                  <CardSkeleton />
-                ) : health ? (
-                  <Box>
-                    <Box sx={{ mb: 2 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="body2">Status</Typography>
-                        <Chip
-                          label={health.status?.toUpperCase() || 'UNKNOWN'}
-                          color={health.status === 'healthy' ? 'success' : 'warning'}
-                          size="small"
-                        />
+                {monthlyLoading ? (
+                  <Box sx={{ mt: 2 }}>
+                    {[...Array(4)].map((_, i) => (
+                      <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+                        <Box sx={{ width: '60%', height: 16, bgcolor: 'action.hover', borderRadius: 1 }} />
+                        <Box sx={{ width: '20%', height: 16, bgcolor: 'action.hover', borderRadius: 1 }} />
                       </Box>
-                      {health.version && (
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                          <Typography variant="body2">Version</Typography>
-                          <Typography variant="body2" fontWeight={600}>
-                            {health.version}
-                          </Typography>
-                        </Box>
-                      )}
-                      {health.avgResponseTime !== undefined && (
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                          <Typography variant="body2">Avg Response Time</Typography>
-                          <Typography variant="body2" fontWeight={600}>
-                            {health.avgResponseTime}ms
-                          </Typography>
-                        </Box>
-                      )}
-                    </Box>
-                    {health.successRate !== undefined && (
-                      <Box sx={{ mb: 1 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                          <Typography variant="caption">Success Rate</Typography>
-                          <Typography variant="caption" fontWeight={600}>
-                            {formatPercent(health.successRate)}
-                          </Typography>
-                        </Box>
-                        <LinearProgress
-                          variant="determinate"
-                          value={health.successRate * 100}
-                          color="success"
-                        />
-                      </Box>
-                    )}
+                    ))}
                   </Box>
-                ) : null}
+                ) : (
+                  <Box sx={{ mt: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+                      <Typography variant="body2" color="text.secondary">Applications Received</Typography>
+                      <Typography variant="body2" fontWeight={600}>{monthlyStats?.applicationsReceived || 0}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+                      <Typography variant="body2" color="text.secondary">Loans Approved</Typography>
+                      <Typography variant="body2" fontWeight={600} color="success.main">
+                        {monthlyStats?.loansApproved || 0}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+                      <Typography variant="body2" color="text.secondary">Pending Review</Typography>
+                      <Typography variant="body2" fontWeight={600} color="warning.main">{monthlyStats?.pendingReview || 0}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5 }}>
+                      <Typography variant="body2" color="text.secondary">Interest Rate</Typography>
+                      <Typography variant="body2" fontWeight={600}>{monthlyStats?.avgInterestRate || 12}% APR</Typography>
+                    </Box>
+                  </Box>
+                )}
               </CardContent>
             </Card>
           </Grid>
@@ -244,10 +250,11 @@ export default function Dashboard() {
                     <Button
                       fullWidth
                       variant="outlined"
-                      disabled
+                      startIcon={<Payments />}
+                      onClick={() => router.push('/review')}
                       sx={{ py: 2 }}
                     >
-                      Batch Upload
+                      Review Applications
                     </Button>
                   </Grid>
                 </Grid>
@@ -255,21 +262,22 @@ export default function Dashboard() {
             </Card>
           </Grid>
 
-          {/* Recent Predictions */}
+          {/* Recent Applications */}
           <Grid item xs={12}>
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom fontWeight={600}>
-                  Recent Predictions
+                  Recent Applications
                 </Typography>
-                {predictionsLoading ? (
+                {applicationsLoading ? (
                   <TableSkeleton rows={5} />
-                ) : recentPredictions && recentPredictions.length > 0 ? (
+                ) : recentApplications && recentApplications.length > 0 ? (
                   <TableContainer component={Paper} elevation={0}>
                     <Table>
                       <TableHead>
                         <TableRow>
                           <TableCell>Applicant</TableCell>
+                          <TableCell>Loan Amount</TableCell>
                           <TableCell>Risk Score</TableCell>
                           <TableCell>Risk Level</TableCell>
                           <TableCell>Decision</TableCell>
@@ -278,25 +286,30 @@ export default function Dashboard() {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {recentPredictions.map((prediction) => {
-                          const riskLevel = getRiskLevel(prediction.riskScore);
+                        {recentApplications.map((application) => {
+                          const riskLevel = getRiskLevel(application.riskScore);
                           const riskColor = getRiskColor(riskLevel);
                           
                           return (
                             <TableRow
-                              key={prediction.id}
+                              key={application.id}
                               hover
                               sx={{ cursor: 'pointer' }}
-                              onClick={() => router.push(`/applicant/${prediction.id}`)}
+                              onClick={() => router.push(`/applicant/${application.id}`)}
                             >
                               <TableCell>
                                 <Typography variant="body2" fontWeight={600}>
-                                  {prediction.applicantName}
+                                  {application.applicantName}
                                 </Typography>
                               </TableCell>
                               <TableCell>
                                 <Typography variant="body2">
-                                  {(prediction.riskScore * 100).toFixed(1)}%
+                                  {formatLKR(application.loanAmount || 0)}
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2">
+                                  {(application.riskScore * 100).toFixed(1)}%
                                 </Typography>
                               </TableCell>
                               <TableCell>
@@ -312,12 +325,12 @@ export default function Dashboard() {
                               </TableCell>
                               <TableCell>
                                 <Chip
-                                  label={prediction.decision}
+                                  label={application.decision}
                                   size="small"
                                   color={
-                                    prediction.decision === 'APPROVE'
+                                    application.decision === 'APPROVE'
                                       ? 'success'
-                                      : prediction.decision === 'REJECT'
+                                      : application.decision === 'REJECT'
                                       ? 'error'
                                       : 'warning'
                                   }
@@ -325,12 +338,12 @@ export default function Dashboard() {
                               </TableCell>
                               <TableCell>
                                 <Typography variant="caption" color="text.secondary">
-                                  {formatRelativeTime(prediction.timestamp)}
+                                  {formatRelativeTime(application.timestamp)}
                                 </Typography>
                               </TableCell>
                               <TableCell>
                                 <Chip
-                                  label={prediction.status.toUpperCase()}
+                                  label={application.status}
                                   size="small"
                                   variant="outlined"
                                 />
@@ -343,7 +356,7 @@ export default function Dashboard() {
                   </TableContainer>
                 ) : (
                   <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-                    No recent predictions
+                    No recent applications
                   </Typography>
                 )}
               </CardContent>

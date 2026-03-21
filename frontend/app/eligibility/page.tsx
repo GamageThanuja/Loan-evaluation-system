@@ -35,8 +35,10 @@ import {
   TrendingUp,
   TrendingDown,
   Psychology,
+  Settings,
 } from '@mui/icons-material';
 import predictionService from '@/services/prediction';
+import { applicantService } from '@/services/applicants';
 import { ApplicantOption, EligibilityResult } from '@/types';
 
 const loanDurations = [
@@ -80,6 +82,11 @@ export default function EligibilityPage() {
   const [sentForReview, setSentForReview] = useState(false);
   const [errors, setErrors] = useState<{ applicant?: string; amount?: string; duration?: string; income?: string }>({});
   const [apiError, setApiError] = useState<string | null>(null);
+  const [isEditingParameters, setIsEditingParameters] = useState(false);
+  const [addingToQueue, setAddingToQueue] = useState(false);
+  
+  // Determine if loan parameters should be locked (when applicant selected, unless editing)
+  const areParametersLocked = Boolean(selectedApplicant && !isEditingParameters);
 
   // Load applicants from API
   useEffect(() => {
@@ -120,9 +127,10 @@ export default function EligibilityPage() {
           if (applicant.loanAmount && applicant.loanAmount > 0) {
             setLoanAmount(applicant.loanAmount.toString());
           }
-          // Auto-fill loan term if available
-          if (applicant.loanTermMonths && applicant.loanTermMonths > 0) {
-            setLoanDuration(applicant.loanTermMonths);
+          // Auto-fill loan term if available (check both camelCase and snake_case)
+          const loanTerm = applicant.loanTermMonths || (applicant as any).loan_term_months;
+          if (loanTerm && loanTerm > 0) {
+            setLoanDuration(loanTerm);
           }
           // Auto-fill monthly income if available
           if (applicant.monthlyIncome && applicant.monthlyIncome > 0) {
@@ -243,6 +251,30 @@ export default function EligibilityPage() {
     setSentForReview(false);
     setErrors({});
     setApiError(null);
+    setIsEditingParameters(false);
+  };
+
+  // Handle adding not-eligible applicant to review queue
+  const handleAddToQueue = async () => {
+    if (!selectedApplicant) return;
+    
+    setAddingToQueue(true);
+    try {
+      const response = await applicantService.addToQueue(selectedApplicant.id.toString());
+      if (response.success) {
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: applicantKeys.all });
+        // Show success state
+        setSentForReview(true);
+        setEvaluationStatus('idle');
+      } else {
+        setApiError(response.error || 'Failed to add to queue');
+      }
+    } catch (error) {
+      setApiError('An unexpected error occurred');
+    } finally {
+      setAddingToQueue(false);
+    }
   };
 
   // Smart retry: Suggest better parameters based on rejection reasons
@@ -321,6 +353,7 @@ export default function EligibilityPage() {
     setSentForReview(false);
     setErrors({});
     setApiError(null);
+    setIsEditingParameters(true); // Enable editing of parameters
   };
 
   const formatCurrency = (value: string | number) => {
@@ -339,9 +372,7 @@ export default function EligibilityPage() {
         <Typography variant="h4" gutterBottom fontWeight={700}>
           Loan Eligibility Evaluation
         </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Evaluate loan eligibility using our Hybrid ML Model (TabNet + Bayesian Network)
-        </Typography>
+       
       </Box>
 
       {apiError && (
@@ -372,6 +403,7 @@ export default function EligibilityPage() {
                     value={selectedApplicant}
                     onChange={(_, newValue) => {
                       setSelectedApplicant(newValue);
+                      setIsEditingParameters(false); // Reset editing state when applicant changes
                       if (errors.applicant) setErrors({ ...errors, applicant: undefined });
                     }}
                     disabled={evaluationStatus === 'processing'}
@@ -404,7 +436,7 @@ export default function EligibilityPage() {
                 )}
               </Grid>
 
-              {/* Monthly Income */}
+              {/* Monthly Income - Always editable */}
               <Grid item xs={12}>
                 <TextField
                   fullWidth
@@ -424,7 +456,7 @@ export default function EligibilityPage() {
                 />
               </Grid>
 
-              {/* Loan Amount */}
+              {/* Loan Amount - Locked when applicant selected, unless editing parameters */}
               <Grid item xs={12}>
                 <TextField
                   fullWidth
@@ -436,15 +468,20 @@ export default function EligibilityPage() {
                     if (errors.amount) setErrors({ ...errors, amount: undefined });
                   }}
                   error={Boolean(errors.amount)}
-                  helperText={errors.amount || (loanAmount ? formatCurrency(loanAmount) : 'Enter the requested loan amount')}
-                  disabled={evaluationStatus === 'processing'}
+                  helperText={
+                    areParametersLocked 
+                      ? 'Amount locked - use "Try Different Parameters" to edit'
+                      : errors.amount || (loanAmount ? formatCurrency(loanAmount) : 'Enter the requested loan amount')
+                  }
+                  disabled={evaluationStatus === 'processing' || areParametersLocked}
                   InputProps={{
                     startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>LKR</Typography>,
                   }}
+                  sx={areParametersLocked ? { '& .MuiInputBase-input': { color: 'text.secondary' } } : {}}
                 />
               </Grid>
 
-              {/* Loan Duration */}
+              {/* Loan Duration - Locked when applicant selected, unless editing parameters */}
               <Grid item xs={12}>
                 <TextField
                   fullWidth
@@ -456,8 +493,13 @@ export default function EligibilityPage() {
                     if (errors.duration) setErrors({ ...errors, duration: undefined });
                   }}
                   error={Boolean(errors.duration)}
-                  helperText={errors.duration || 'Select the repayment period'}
-                  disabled={evaluationStatus === 'processing'}
+                  helperText={
+                    areParametersLocked 
+                      ? 'Duration locked - use "Try Different Parameters" to edit'
+                      : errors.duration || 'Select the repayment period'
+                  }
+                  disabled={evaluationStatus === 'processing' || areParametersLocked}
+                  sx={areParametersLocked ? { '& .MuiInputBase-input': { color: 'text.secondary' } } : {}}
                 >
                   {loanDurations.map((option) => (
                     <MenuItem key={option.value} value={option.value}>
@@ -469,26 +511,41 @@ export default function EligibilityPage() {
 
               {/* Action Buttons */}
               <Grid item xs={12}>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  <Button
-                    variant="contained"
-                    size="large"
-                    onClick={handleEvaluate}
-                    disabled={evaluationStatus === 'processing'}
-                    startIcon={evaluationStatus === 'processing' ? <CircularProgress size={20} color="inherit" /> : <Psychology />}
-                    fullWidth
-                  >
-                    {evaluationStatus === 'processing' ? 'Analyzing...' : 'Evaluate Eligibility'}
-                  </Button>
-                  {evaluationStatus !== 'idle' && evaluationStatus !== 'processing' && (
+                <Box sx={{ display: 'flex', gap: 2, flexDirection: 'column' }}>
+                  {/* Show "Try Different Parameters" button when parameters are locked */}
+                  {areParametersLocked && !isEditingParameters && (
                     <Button
                       variant="outlined"
                       size="large"
-                      onClick={handleReset}
+                      onClick={handleTryDifferentParameters}
+                      fullWidth
                     >
-                      Reset
+                      Try Different Parameters
                     </Button>
                   )}
+                  
+                  {/* Main action buttons */}
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Button
+                      variant="contained"
+                      size="large"
+                      onClick={handleEvaluate}
+                      disabled={evaluationStatus === 'processing' || !selectedApplicant}
+                      startIcon={evaluationStatus === 'processing' ? <CircularProgress size={20} color="inherit" /> : <Psychology />}
+                      fullWidth
+                    >
+                      {evaluationStatus === 'processing' ? 'Analyzing...' : 'Evaluate Eligibility'}
+                    </Button>
+                    {(evaluationStatus !== 'idle' && evaluationStatus !== 'processing') || isEditingParameters ? (
+                      <Button
+                        variant="outlined"
+                        size="large"
+                        onClick={handleReset}
+                      >
+                        Reset
+                      </Button>
+                    ) : null}
+                  </Box>
                 </Box>
               </Grid>
             </Grid>
@@ -507,31 +564,32 @@ export default function EligibilityPage() {
                 justifyContent: 'center',
                 alignItems: 'center',
                 py: 8,
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
+                border: '1px solid',
+                borderColor: 'primary.main',
+                bgcolor: 'background.paper',
               }}>
                 <CardContent sx={{ textAlign: 'center' }}>
                   <Box sx={{ position: 'relative', display: 'inline-flex', mb: 3 }}>
                     <CircularProgress
                       size={100}
                       thickness={2}
-                      sx={{ color: 'rgba(255,255,255,0.3)' }}
+                      sx={{ color: 'primary.light' }}
                     />
                     <CircularProgress
                       size={100}
                       thickness={2}
                       sx={{
-                        color: 'white',
+                        color: 'primary.main',
                         position: 'absolute',
                         left: 0,
                         animationDuration: '2s',
                       }}
                     />
                   </Box>
-                  <Typography variant="h5" fontWeight={600} gutterBottom>
+                  <Typography variant="h5" fontWeight={600} color="primary.main" gutterBottom>
                     {processingMessage}
                   </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  <Typography variant="body2" color="text.secondary">
                     Using Hybrid TabNet + Bayesian Network Model
                   </Typography>
                 </CardContent>
@@ -544,29 +602,43 @@ export default function EligibilityPage() {
             <Fade in>
               <Card sx={{
                 height: '100%',
-                background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-                color: 'white',
+                border: '1px solid',
+                borderColor: 'success.main',
+                bgcolor: 'background.paper',
               }}>
                 <CardContent sx={{ py: 4 }}>
                   <Box sx={{ textAlign: 'center', mb: 3 }}>
-                    <CheckCircle sx={{ fontSize: 60, mb: 1 }} />
-                    <Typography variant="h4" fontWeight={700} gutterBottom>
+                    <Box sx={{ 
+                      width: 64, 
+                      height: 64, 
+                      borderRadius: '50%', 
+                      bgcolor: 'success.light', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      mx: 'auto',
+                      mb: 2
+                    }}>
+                      <CheckCircle sx={{ fontSize: 36, color: 'success.main' }} />
+                    </Box>
+                    <Typography variant="h5" fontWeight={700} color="success.main" gutterBottom>
                       ELIGIBLE
                     </Typography>
                     <Chip
                       label={evaluationResult.risk_level}
-                      color="default"
-                      sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}
+                      color="success"
+                      variant="outlined"
+                      size="small"
                     />
                   </Box>
 
                   {/* AI Reasoning */}
-                  <Box sx={{ bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 2, p: 2, mb: 3 }}>
-                    <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <Box sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 2, mb: 3 }}>
+                    <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', mb: 1, color: 'text.secondary' }}>
                       <Psychology sx={{ mr: 1, fontSize: 18 }} />
                       AI Reasoning
                     </Typography>
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.primary">
                       {evaluationResult.summary_explanation}
                     </Typography>
                   </Box>
@@ -574,15 +646,15 @@ export default function EligibilityPage() {
                   {/* Protective Factors */}
                   {evaluationResult.protective_factors && evaluationResult.protective_factors.length > 0 && (
                     <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                        <TrendingDown sx={{ mr: 1, fontSize: 18 }} />
+                      <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', mb: 1, color: 'text.secondary' }}>
+                        <TrendingDown sx={{ mr: 1, fontSize: 18, color: 'success.main' }} />
                         Positive Factors
                       </Typography>
                       <List dense sx={{ py: 0 }}>
                         {evaluationResult.protective_factors.slice(0, 3).map((factor, idx) => (
                           <ListItem key={idx} sx={{ py: 0.5, px: 0 }}>
                             <ListItemIcon sx={{ minWidth: 28 }}>
-                              <CheckCircle sx={{ fontSize: 16, color: 'white' }} />
+                              <CheckCircle sx={{ fontSize: 16, color: 'success.main' }} />
                             </ListItemIcon>
                             <ListItemText
                               primary={factor.explanation}
@@ -597,8 +669,8 @@ export default function EligibilityPage() {
                   {/* Recommendations */}
                   {evaluationResult.recommendations && evaluationResult.recommendations.length > 0 && (
                     <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                        <Lightbulb sx={{ mr: 1, fontSize: 18 }} />
+                      <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', mb: 1, color: 'text.secondary' }}>
+                        <Lightbulb sx={{ mr: 1, fontSize: 18, color: 'warning.main' }} />
                         Recommendations
                       </Typography>
                       <List dense sx={{ py: 0 }}>
@@ -614,18 +686,18 @@ export default function EligibilityPage() {
                     </Box>
                   )}
 
-                  <Divider sx={{ bgcolor: 'rgba(255,255,255,0.3)', my: 2 }} />
+                  <Divider sx={{ my: 2 }} />
 
                   {/* Summary */}
                   <Grid container spacing={1} sx={{ mb: 3 }}>
                     <Grid item xs={6}>
-                      <Typography variant="caption" sx={{ opacity: 0.8 }}>Risk Score</Typography>
+                      <Typography variant="caption" color="text.secondary">Risk Score</Typography>
                       <Typography variant="h6" fontWeight={600}>
                         {(evaluationResult.risk_score * 100).toFixed(1)}%
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
-                      <Typography variant="caption" sx={{ opacity: 0.8 }}>Confidence</Typography>
+                      <Typography variant="caption" color="text.secondary">Confidence</Typography>
                       <Typography variant="h6" fontWeight={600}>
                         {(evaluationResult.confidence_score * 100).toFixed(0)}%
                       </Typography>
@@ -634,15 +706,11 @@ export default function EligibilityPage() {
 
                   <Button
                     variant="contained"
+                    color="success"
                     size="large"
                     fullWidth
                     onClick={handleSendForReview}
                     endIcon={<ArrowForward />}
-                    sx={{
-                      bgcolor: 'white',
-                      color: '#11998e',
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' },
-                    }}
                   >
                     Send for Manager Review
                   </Button>
@@ -661,15 +729,28 @@ export default function EligibilityPage() {
                 justifyContent: 'center',
                 alignItems: 'center',
                 py: 8,
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
+                border: '1px solid',
+                borderColor: 'primary.main',
+                bgcolor: 'background.paper',
               }}>
                 <CardContent sx={{ textAlign: 'center' }}>
-                  <CheckCircle sx={{ fontSize: 80, mb: 3 }} />
-                  <Typography variant="h5" fontWeight={700} gutterBottom>
+                  <Box sx={{ 
+                    width: 80, 
+                    height: 80, 
+                    borderRadius: '50%', 
+                    bgcolor: 'primary.light', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    mx: 'auto',
+                    mb: 3
+                  }}>
+                    <CheckCircle sx={{ fontSize: 48, color: 'primary.main' }} />
+                  </Box>
+                  <Typography variant="h5" fontWeight={700} color="primary.main" gutterBottom>
                     Sent for Manager Review
                   </Typography>
-                  <Typography variant="body1" sx={{ mb: 4, opacity: 0.9 }}>
+                  <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
                     The application has been successfully submitted for review.
                     The manager will be notified.
                   </Typography>
@@ -677,11 +758,6 @@ export default function EligibilityPage() {
                     variant="outlined"
                     size="large"
                     onClick={handleReset}
-                    sx={{
-                      color: 'white',
-                      borderColor: 'white',
-                      '&:hover': { borderColor: 'white', bgcolor: 'rgba(255,255,255,0.1)' }
-                    }}
                   >
                     Evaluate Another Application
                   </Button>
@@ -695,29 +771,43 @@ export default function EligibilityPage() {
             <Fade in>
               <Card sx={{
                 height: '100%',
-                background: 'linear-gradient(135deg, #eb3349 0%, #f45c43 100%)',
-                color: 'white',
+                border: '1px solid',
+                borderColor: 'error.main',
+                bgcolor: 'background.paper',
               }}>
                 <CardContent sx={{ py: 4 }}>
                   <Box sx={{ textAlign: 'center', mb: 3 }}>
-                    <Cancel sx={{ fontSize: 60, mb: 1 }} />
-                    <Typography variant="h4" fontWeight={700} gutterBottom>
+                    <Box sx={{ 
+                      width: 64, 
+                      height: 64, 
+                      borderRadius: '50%', 
+                      bgcolor: 'error.light', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      mx: 'auto',
+                      mb: 2
+                    }}>
+                      <Cancel sx={{ fontSize: 36, color: 'error.main' }} />
+                    </Box>
+                    <Typography variant="h5" fontWeight={700} color="error.main" gutterBottom>
                       NOT ELIGIBLE
                     </Typography>
                     <Chip
                       label={evaluationResult.risk_level}
-                      color="default"
-                      sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}
+                      color="error"
+                      variant="outlined"
+                      size="small"
                     />
                   </Box>
 
                   {/* AI Reasoning */}
-                  <Box sx={{ bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 2, p: 2, mb: 3 }}>
-                    <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <Box sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 2, mb: 3 }}>
+                    <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', mb: 1, color: 'text.secondary' }}>
                       <Psychology sx={{ mr: 1, fontSize: 18 }} />
                       AI Reasoning
                     </Typography>
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.primary">
                       {evaluationResult.summary_explanation}
                     </Typography>
                   </Box>
@@ -725,15 +815,15 @@ export default function EligibilityPage() {
                   {/* Risk Factors */}
                   {evaluationResult.risk_factors && evaluationResult.risk_factors.length > 0 && (
                     <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                        <TrendingUp sx={{ mr: 1, fontSize: 18 }} />
+                      <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', mb: 1, color: 'text.secondary' }}>
+                        <TrendingUp sx={{ mr: 1, fontSize: 18, color: 'error.main' }} />
                         Risk Factors
                       </Typography>
                       <List dense sx={{ py: 0 }}>
                         {evaluationResult.risk_factors.slice(0, 4).map((factor, idx) => (
                           <ListItem key={idx} sx={{ py: 0.5, px: 0 }}>
                             <ListItemIcon sx={{ minWidth: 28 }}>
-                              <Warning sx={{ fontSize: 16, color: 'white' }} />
+                              <Warning sx={{ fontSize: 16, color: 'warning.main' }} />
                             </ListItemIcon>
                             <ListItemText
                               primary={factor.explanation}
@@ -748,8 +838,8 @@ export default function EligibilityPage() {
                   {/* Recommendations */}
                   {evaluationResult.recommendations && evaluationResult.recommendations.length > 0 && (
                     <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                        <Lightbulb sx={{ mr: 1, fontSize: 18 }} />
+                      <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', mb: 1, color: 'text.secondary' }}>
+                        <Lightbulb sx={{ mr: 1, fontSize: 18, color: 'warning.main' }} />
                         Recommendations
                       </Typography>
                       <List dense sx={{ py: 0 }}>
@@ -765,18 +855,18 @@ export default function EligibilityPage() {
                     </Box>
                   )}
 
-                  <Divider sx={{ bgcolor: 'rgba(255,255,255,0.3)', my: 2 }} />
+                  <Divider sx={{ my: 2 }} />
 
                   {/* Summary */}
                   <Grid container spacing={1} sx={{ mb: 3 }}>
                     <Grid item xs={6}>
-                      <Typography variant="caption" sx={{ opacity: 0.8 }}>Risk Score</Typography>
+                      <Typography variant="caption" color="text.secondary">Risk Score</Typography>
                       <Typography variant="h6" fontWeight={600}>
                         {(evaluationResult.risk_score * 100).toFixed(1)}%
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
-                      <Typography variant="caption" sx={{ opacity: 0.8 }}>Confidence</Typography>
+                      <Typography variant="caption" color="text.secondary">Confidence</Typography>
                       <Typography variant="h6" fontWeight={600}>
                         {(evaluationResult.confidence_score * 100).toFixed(0)}%
                       </Typography>
@@ -784,17 +874,15 @@ export default function EligibilityPage() {
                   </Grid>
 
                   <Button
-                    variant="outlined"
+                    variant="contained"
+                    color="warning"
                     size="large"
                     fullWidth
-                    onClick={handleTryDifferentParameters}
-                    sx={{
-                      color: 'white',
-                      borderColor: 'white',
-                      '&:hover': { borderColor: 'white', bgcolor: 'rgba(255,255,255,0.1)' }
-                    }}
+                    onClick={handleAddToQueue}
+                    disabled={addingToQueue}
+                    startIcon={addingToQueue ? <CircularProgress size={20} color="inherit" /> : <ArrowForward />}
                   >
-                    Try Different Parameters
+                    {addingToQueue ? 'Adding to Queue...' : 'Add to Queue'}
                   </Button>
                 </CardContent>
               </Card>
@@ -831,14 +919,6 @@ export default function EligibilityPage() {
                 <Typography variant="h6" color="text.secondary" gutterBottom>
                   AI-Powered Eligibility Check
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Our hybrid model combines TabNet deep learning with Bayesian Network reasoning to provide accurate predictions with explainable decisions.
-                </Typography>
-                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
-                  <Chip label="TabNet" size="small" variant="outlined" />
-                  <Chip label="Bayesian Network" size="small" variant="outlined" />
-                  <Chip label="Explainable AI" size="small" variant="outlined" />
-                </Box>
               </CardContent>
             </Card>
           )}

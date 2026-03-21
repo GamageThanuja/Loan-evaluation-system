@@ -11,7 +11,7 @@ backend_dir = Path(__file__).parent
 project_root = backend_dir.parent
 
 sys.path.insert(0, str(backend_dir))
-sys.path.insert(0, str(project_root / "middleware"))
+sys.path.insert(0, str(Path(__file__).parent / "middleware"))
 sys.path.insert(0, str(project_root / "database"))
 
 from fastapi import FastAPI, HTTPException, Depends, Request, status
@@ -30,7 +30,6 @@ security = HTTPBearer()
 load_dotenv(project_root / ".env")
 
 # Import middleware
-sys.path.insert(0, str(project_root))
 from middleware.auth import AuthMiddleware, auth_middleware, hash_password, verify_password
 from middleware.logging_middleware import logging_middleware, setup_logging
 from middleware.error_handler import setup_error_handlers
@@ -44,6 +43,7 @@ from routers import loan_details as loan_details_module
 from routers import applicants as applicants_module
 from routers import predictions as predictions_module
 from routers import status_management as status_management_module
+from routers import dashboard as dashboard_module
 
 # Setup logging
 setup_logging(
@@ -127,18 +127,8 @@ app.include_router(predictions_module.router)
 # Mount status management router (Eligibility, Application Status, Status Colors)
 app.include_router(status_management_module.router)
 
-# ============================================
-# DASHBOARD ENDPOINTS
-# ============================================
-
-@app.get("/api/dashboard/stats")
-async def get_dashboard_stats():
-    """Get dashboard statistics"""
-    stats = db.get_dashboard_stats()
-    return {
-        "success": True,
-        "data": stats
-    }
+# Mount dashboard router (Financial stats, monthly summary, recent applications)
+app.include_router(dashboard_module.router)
 
 @app.get("/api/model/health")
 async def model_health():

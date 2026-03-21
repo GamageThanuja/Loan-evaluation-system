@@ -1,21 +1,90 @@
 {
-  "model_versions": [
-    {
-      "version": "1.0.0",
-      "date": "2026-01-03",
-      "models": {
-        "tabnet": "models/tabnet/tabnet_model.zip",
-        "bayesian": "models/bayesian/bayesian_network.pkl",
-        "hybrid": "models/hybrid/hybrid_model.pkl"
-      },
+  "models": {
+    "hybrid_model": {
+      "version": "3.0.0",
+      "path": "hybrid_model.joblib",
+      "architecture": "Bayesian Neural Network + Gradient Boosting Ensemble",
+      "created_at": "2026-02-03",
       "metrics": {
-        "roc_auc": null,
-        "accuracy": null,
-        "f1_score": null
+        "accuracy": 0.9941,
+        "precision": 0.9944,
+        "recall": 0.9962,
+        "f1_score": 0.9953,
+        "roc_auc": 0.9998
       },
-      "status": "development",
-      "notes": "Initial model version"
+      "components": {
+        "bayesian_neural_network": {
+          "framework": "PyTorch",
+          "hidden_layers": [128, 64, 32],
+          "dropout_rate": 0.3,
+          "mc_samples": 50,
+          "purpose": "Uncertainty quantification via MC-Dropout"
+        },
+        "gradient_boosting": {
+          "library": "sklearn",
+          "n_estimators": 100,
+          "max_depth": 5,
+          "calibrated": true,
+          "purpose": "Robust probability estimation"
+        },
+        "ensemble_weights": {
+          "bnn": 0.6,
+          "gb": 0.4
+        },
+        "loss_function": {
+          "type": "Focal Loss",
+          "alpha": 0.75,
+          "gamma": 2.0
+        }
+      },
+      "preprocessing": {
+        "scaler": "StandardScaler",
+        "pca_components": 12,
+        "pca_variance_explained": 0.9632,
+        "class_balancing": "SMOTE-Tomek"
+      },
+      "training": {
+        "dataset": "loan_approval_dataset.csv",
+        "samples": 4269,
+        "features_raw": 22,
+        "features_pca": 12,
+        "approval_rate": "62.2%",
+        "class_imbalance_handling": "SMOTE-Tomek"
+      },
+      "thresholds": {
+        "optimal": 0.5,
+        "optimization_metric": "F1"
+      },
+      "is_production": true
+    },
+    "bayesian_nn": {
+      "version": "3.0.0",
+      "path": "bayesian_nn.joblib",
+      "architecture": "MC-Dropout Bayesian Neural Network",
+      "created_at": "2026-02-03",
+      "metrics": {
+        "accuracy": 0.9953,
+        "precision": 0.9925,
+        "recall": 1.0,
+        "f1_score": 0.9962,
+        "roc_auc": 0.9999
+      },
+      "is_production": false
+    },
+    "bayesian_network": {
+      "version": "3.0.0",
+      "path": "bayesian_network.joblib",
+      "architecture": "Calibrated Gradient Boosting",
+      "created_at": "2026-02-03",
+      "metrics": {
+        "accuracy": 0.9941,
+        "precision": 0.9944,
+        "recall": 0.9962,
+        "f1_score": 0.9953,
+        "roc_auc": 0.9942
+      },
+      "is_production": false
     }
-  ],
-  "active_version": "1.0.0"
+  },
+  "current_production": "hybrid_model"
 }

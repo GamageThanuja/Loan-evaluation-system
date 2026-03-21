@@ -43,7 +43,7 @@ def check_model_files():
     print("\n🤖 Checking Model Files...\n")
     
     files = [
-        ("TabNet Optimized", Config.TABNET_OPTIMIZED),
+        ("TabNet Model", Config.TABNET_MODEL),
         ("Optimal Threshold", Config.OPTIMAL_THRESHOLD),
         ("Bayesian Network", Config.BAYESIAN_MODEL),
         ("Hybrid Model", Config.HYBRID_MODEL),
@@ -55,7 +55,7 @@ def check_model_files():
         status = "✅" if exists else "⚠️"
         size = f"({path.stat().st_size / 1024:.1f} KB)" if exists else ""
         print(f"{status} {name}: {path.name} {size}")
-        if not exists and name in ["TabNet Optimized", "Optimal Threshold"]:
+        if not exists and name in ["TabNet Model", "Optimal Threshold"]:
             all_good = False
     
     return all_good

@@ -44,16 +44,12 @@ class ModelEvaluator:
         from pytorch_tabnet.tab_model import TabNetClassifier
         self.tabnet_model = TabNetClassifier()
         
-        # Try to load optimized model first, fall back to regular model
-        optimized_model_path = self.models_path / 'tabnet' / 'tabnet_imbalance_optimized.zip.zip'
-        regular_model_path = self.models_path / 'tabnet' / 'tabnet_model.zip'
+        # Load TabNet model
+        model_path = self.models_path / 'tabnet' / 'tabnet_imbalance_optimized.zip'
         
-        if optimized_model_path.exists():
-            logger.info("Loading optimized TabNet model...")
-            self.tabnet_model.load_model(str(optimized_model_path))
-        elif regular_model_path.exists():
-            logger.info("Loading regular TabNet model...")
-            self.tabnet_model.load_model(str(regular_model_path))
+        if model_path.exists():
+            logger.info("Loading TabNet model...")
+            self.tabnet_model.load_model(str(model_path))
         else:
             raise FileNotFoundError("No TabNet model found!")
         
@@ -229,12 +225,17 @@ class ModelEvaluator:
 
 def main():
     """Main execution function"""
-    project_root = Path(__file__).parent.parent.parent
+    import sys
+    from pathlib import Path
+    # Add src to path to import Config
+    backend_dir = Path(__file__).parent.parent.parent
+    sys.path.insert(0, str(backend_dir / 'src'))
+    from config import Config
     
     evaluator = ModelEvaluator(
-        data_path=str(project_root / 'data' / 'processed'),
-        models_path=str(project_root / 'models'),
-        output_path=str(project_root / 'reports')
+        data_path=str(Config.DATA_PROCESSED),
+        models_path=str(Config.MODELS_DIR),
+        output_path=str(Config.REPORTS_DIR)
     )
     
     results = evaluator.run_evaluation()

@@ -35,7 +35,10 @@ class SHAPExplainer:
         logger.info("Loading TabNet model...")
         from pytorch_tabnet.tab_model import TabNetClassifier
         self.model = TabNetClassifier()
-        self.model.load_model(str(self.model_path / 'tabnet_model.zip'))
+        model_path = self.model_path / 'tabnet_imbalance_optimized.zip'
+        if not model_path.exists():
+            raise FileNotFoundError(f"TabNet model not found at {model_path}")
+        self.model.load_model(str(model_path))
         
         self.feature_names = X_test.columns.tolist()
         
@@ -148,12 +151,17 @@ class SHAPExplainer:
 
 def main():
     """Main execution function"""
-    project_root = Path(__file__).parent.parent.parent
+    import sys
+    from pathlib import Path
+    # Add src to path to import Config
+    backend_dir = Path(__file__).parent.parent.parent
+    sys.path.insert(0, str(backend_dir / 'src'))
+    from config import Config
     
     explainer = SHAPExplainer(
-        model_path=str(project_root / 'models' / 'tabnet'),
-        data_path=str(project_root / 'data' / 'processed'),
-        output_path=str(project_root / 'reports' / 'figures')
+        model_path=str(Config.TABNET_DIR),
+        data_path=str(Config.DATA_PROCESSED),
+        output_path=str(Config.FIGURES_DIR)
     )
     
     explainer.run_analysis()

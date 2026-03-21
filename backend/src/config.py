@@ -27,21 +27,24 @@ class Config:
     
     # Model paths - Use ml-model directory for trained models
     MODELS_DIR = OVERALL_PROJECT_ROOT / 'ml-model' / 'models'
-    TABNET_DIR = MODELS_DIR / 'tabnet'
-    BAYESIAN_DIR = MODELS_DIR / 'bayesian'
-    HYBRID_DIR = MODELS_DIR / 'hybrid'
+    TABNET_DIR = MODELS_DIR  # All models now in root models folder
+    BAYESIAN_DIR = MODELS_DIR
+    HYBRID_DIR = MODELS_DIR
     
     # Output paths
-    REPORTS_DIR = OVERALL_PROJECT_ROOT / 'ml-model' / 'reports'
+    REPORTS_DIR = OVERALL_PROJECT_ROOT / 'reports'
     FIGURES_DIR = REPORTS_DIR / 'figures'
     
-    # Model files
-    TABNET_MODEL = TABNET_DIR / 'tabnet_imbalance_optimized.zip'
-    TABNET_OPTIMIZED = TABNET_DIR / 'tabnet_imbalance_optimized.zip'
-    OPTIMAL_THRESHOLD = TABNET_DIR / 'optimal_threshold.json'
-    BAYESIAN_MODEL = BAYESIAN_DIR / 'bayesian_network.pkl'
-    HYBRID_MODEL = HYBRID_DIR / 'hybrid_model.pkl'
-    HYBRID_WEIGHTS = HYBRID_DIR / 'ensemble_weights.json'
+    # Config path
+    CONFIG_DIR = OVERALL_PROJECT_ROOT / 'config'
+    APP_CONFIG = CONFIG_DIR / 'app_config.yaml'
+    
+    # Model files (single model file)
+    TABNET_MODEL = MODELS_DIR / 'tabnet.zip'
+    OPTIMAL_THRESHOLD = 0.309  # Default threshold
+    BAYESIAN_MODEL = MODELS_DIR / 'bayesian_network.pkl'
+    HYBRID_MODEL = MODELS_DIR / 'tabnet.pkl'
+    HYBRID_WEIGHTS = None  # Not used anymore
     
     # API settings
     API_HOST = os.getenv('API_HOST', '0.0.0.0')
@@ -57,7 +60,7 @@ class Config:
     def get_model_path(cls, model_type: str) -> Path:
         """Get model path by type"""
         paths = {
-            'tabnet': cls.TABNET_OPTIMIZED if cls.TABNET_OPTIMIZED.exists() else cls.TABNET_MODEL,
+            'tabnet': cls.TABNET_MODEL,
             'bayesian': cls.BAYESIAN_MODEL,
             'hybrid': cls.HYBRID_MODEL
         }

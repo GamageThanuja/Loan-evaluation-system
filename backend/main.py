@@ -73,29 +73,52 @@ def run_model_training(data=None):
     logger.info("=" * 80)
     
     try:
-        from src.models.tabnet_train import train_tabnet
-        from src.models.bayesian_network import train_bayesian_network
-        from src.models.hybrid_ensemble import train_hybrid_ensemble
+        # Note: Training scripts have been moved to ml-model/training/
+        # Use the training scripts directly from their new location
+        import sys
+        from pathlib import Path
+        ml_model_dir = Path(__file__).parent.parent / 'ml-model'
+        sys.path.insert(0, str(ml_model_dir))
+        
+        from training.tabnet import TabNetTrainer
+        from training.bayesian import BayesianNetworkModel
+        from training.hybrid_ensemble import HybridEnsemble
+        from src.config import Config
         
         # Train TabNet model
         logger.info("Training TabNet model...")
-        tabnet_model = train_tabnet(data)
+        tabnet_trainer = TabNetTrainer(
+            data_path=str(Config.DATA_PROCESSED),
+            model_path=str(Config.TABNET_DIR),
+            use_smoteenn=True
+        )
+        tabnet_metrics = tabnet_trainer.train_pipeline()
         logger.info("✓ TabNet model trained successfully")
         
         # Train Bayesian Network
         logger.info("Training Bayesian Network...")
-        bn_model = train_bayesian_network(data)
+        bn_model = BayesianNetworkModel(
+            data_path=str(Config.DATA_PROCESSED),
+            model_path=str(Config.BAYESIAN_DIR)
+        )
+        bn_metrics = bn_model.train_pipeline()
         logger.info("✓ Bayesian Network trained successfully")
         
         # Train Hybrid Ensemble
         logger.info("Training Hybrid Ensemble...")
-        ensemble_model = train_hybrid_ensemble(tabnet_model, bn_model, data)
+        ensemble = HybridEnsemble(
+            data_path=str(Config.DATA_PROCESSED),
+            tabnet_path=str(Config.TABNET_DIR),
+            bn_path=str(Config.BAYESIAN_DIR),
+            output_path=str(Config.HYBRID_DIR)
+        )
+        ensemble_metrics = ensemble.train_pipeline()
         logger.info("✓ Hybrid Ensemble trained successfully")
         
         return {
-            'tabnet': tabnet_model,
+            'tabnet': tabnet_trainer,
             'bayesian': bn_model,
-            'ensemble': ensemble_model
+            'ensemble': ensemble
         }
         
     except Exception as e:

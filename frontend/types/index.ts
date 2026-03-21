@@ -216,6 +216,19 @@ export interface DashboardStats {
   modelAUC: number;
 }
 
+export interface FinancialStats {
+  totalLoansDisbursed: number;
+  totalLoanAmount: number;
+  totalInterestEarned: number;
+  avgInterestRate: number;
+  activeLoans: number;
+  paidOffLoans: number;
+  pendingApplications: number;
+  approvedThisMonth: number;
+  approvalRate: number;
+  pendingReviews: number;
+}
+
 export interface ModelHealth {
   status: 'healthy' | 'degraded' | 'offline' | 'unhealthy';
   lastUpdated?: string;

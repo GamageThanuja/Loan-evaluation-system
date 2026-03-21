@@ -1,216 +1,159 @@
-# Home Credit Default Risk - Hybrid Model
+# LoanWise - Intelligent Loan Evaluation System
 
-A hybrid machine learning system combining TabNet and Bayesian Networks for credit default prediction with **71% recall** and **0.702 AUC**.
+A machine learning-powered loan evaluation system with explainable AI using a Hybrid Bayesian Model architecture.
 
-## 📋 Project Overview
+## 🎯 Model Architecture
 
-This project implements a hybrid ensemble model for predicting credit default risk using the Home Credit dataset. The system combines deep learning (TabNet) with probabilistic graphical models (Bayesian Networks) to achieve robust and interpretable predictions.
+### Hybrid Bayesian Model (v2.0.0)
+
+Our production model combines two powerful components:
+
+#### 1. Bayesian Network (PGMPY)
+- **Purpose**: Causal structure learning and probabilistic embeddings
+- **Algorithm**: Hill Climb with BIC scoring
+- **Structure**: Learned 17-21 causal edges from data
+- **Output**: Risk embeddings for BNN input
+
+#### 2. Bayesian Neural Network (PyTorch)
+- **Architecture**: [256, 128, 64] hidden layers
+- **Uncertainty**: MC-Dropout (0.2 rate, 50 forward passes)
+- **Loss Function**: ELBO = BCE + KL Divergence
+- **Class Weights**: {0: 0.544, 1: 6.194} for imbalance handling
+
+### Performance Metrics
+| Metric | Value |
+|--------|-------|
+| Accuracy | 85.39% |
+| Precision | 24.95% |
+| Recall | 40.31% |
+| F1 Score | 30.83% |
+| ROC-AUC | 76.01% |
 
 ### Key Features
-- ✅ **Class Imbalance Handling**: SMOTEENN + Class Weights (92% → 30% sampling)
-- ✅ **Hyperparameter Optimization**: Optuna-based automated tuning
-- ✅ **Explainable AI**: SHAP visualizations for model interpretability
-- ✅ **Production API**: FastAPI with optimal threshold (0.309)
-- ✅ **Centralized Config**: No hardcoded paths, clean maintainable code
+- ✅ **Uncertainty Quantification**: Epistemic & aleatoric uncertainty
+- ✅ **Explainable Predictions**: Causal factor analysis
+- ✅ **Class Imbalance Handling**: Weighted loss function
+- ✅ **Production Ready**: FastAPI backend integration
 
 ## 🏗️ Project Structure
 
 ```
-home-credit-default-risk/
-│
-├── 📁 data/                          # All datasets
-│   ├── raw/                          # Original data files (307,511 train samples)
-│   ├── processed/                    # Preprocessed splits (train/val/test)
-│   └── external/                     # External datasets
-│
-├── 📁 models/                        # Trained models
-│   ├── tabnet/                       # TabNet optimized (2.4MB)
-│   ├── bayesian/                     # Bayesian Network (34KB)
-│   └── hybrid/                       # Ensemble models
-│
-├── 📁 src/                           # Source code
-│   ├── config.py                     # 🆕 Centralized configuration
-│   ├── data/                         # Data pipelines
-│   │   ├── imbalance_fix.py         # 6 resampling methods
-│   │   ├── preprocess.py            # Feature engineering
-│   │   └── merge_home_credit.py     # Data consolidation
-│   ├── models/                       # Model training
-│   │   ├── imbalance_optimized.py   # Best training pipeline (71% recall)
-│   │   ├── hyperparameter_tuning.py # Optuna-based tuning
-│   │   ├── tabnet_train.py          # TabNet training
-│   │   └── bayesian_network.py      # BN training
-│   ├── evaluation/                   # Metrics & validation
-│   │   ├── final_evaluation.py      # Model comparison
-│   │   └── xai_shap.py              # SHAP analysis
-│   └── inference/                    # Production API
-│       └── api.py                    # FastAPI (clean, single implementation)
-│
-├── 📁 reports/                       # Generated reports
-│   └── figures/                      # SHAP visualizations (4 files, 880KB)
-├── 📁 config/                        # YAML configuration files
-├── 📁 docs/                          # Documentation
-├── 📁 schemas/                       # Data validation
-├── 📁 tests/                         # Unit tests
-│
-├── check_health.py                   # Codebase health verification
-├── CLEANUP_SUMMARY.md                # Cleanup documentation
-├── TRAINING_GUIDE.md                 # Model training guide
-├── POSTMAN_GUIDE.md                  # API testing guide
-└── requirements.txt                  # Python dependencies
+Loan-evaluation-system/
+├── backend/                    # FastAPI backend
+│   ├── api.py                 # Main API entry point
+│   ├── routers/               # API routes
+│   │   ├── predictions.py     # ML prediction endpoints
+│   │   ├── applicants.py      # Applicant CRUD
+│   │   └── auth.py            # Authentication
+│   └── src/
+│       └── inference/
+│           └── predictor.py   # Model inference module
+├── frontend/                   # Next.js frontend
+│   ├── app/                   # App router pages
+│   ├── components/            # React components
+│   └── services/              # API services
+├── ml-model/                   # ML model training
+│   ├── training/
+│   │   ├── bayesian_network.py    # BN implementation
+│   │   ├── bayesian_nn.py         # BNN implementation
+│   │   ├── hybrid_model.py        # Combined model
+│   │   └── train_pipeline.py      # Training script
+│   └── models/
+│       └── hybrid/
+│           └── hybrid_bayesian_model.joblib
+├── database/                   # Supabase schemas
+└── scripts/                    # Helper scripts
 ```
 
 ## 🚀 Quick Start
 
-### Installation
+### Prerequisites
+- Python 3.10+
+- Node.js 18+
+- npm or yarn
+
+### 1. Start Backend
 
 ```bash
-# Navigate to project
-cd /Users/Thanuja/Desktop/FYP/home-credit-default-risk
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
+cd backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r ../requirements.txt  # Install from root requirements.txt
+python -m uvicorn api:app --host 0.0.0.0 --port 8000
 ```
 
-### Data Preparation
-
-1. Place raw CSV files in `data/raw/`
-2. Run data merging and preprocessing:
+### 2. Start Frontend
 
 ```bash
-python src/data/merge_home_credit.py
-python src/data/preprocess.py
-python src/data/data_loader.py
+cd frontend
+npm install
+npm run dev
 ```
 
-### Model Training
+### 3. Access Application
 
-### Training Models
+- **Frontend**: http://localhost:3000
+- **API Docs**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
 
-Train with imbalance optimization (recommended):
+## 🔧 API Endpoints
+
+### Predictions
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/predictions/predict` | POST | Basic prediction |
+| `/api/predictions/predict/explain` | POST | Prediction with explanation |
+| `/api/predictions/eligibility` | POST | Full eligibility check |
+
+### Health
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | API health status |
+| `/api/model/health` | GET | Model health status |
+
+## 📊 Training the Model
 
 ```bash
-# Train optimized TabNet with SMOTEENN + Class Weights
-python src/models/imbalance_optimized.py
-
-# Run hyperparameter tuning (optional)
-python src/models/hyperparameter_tuning.py
-
-# Evaluate all models
-python src/evaluation/final_evaluation.py
-
-# Generate SHAP explanations
-python src/evaluation/xai_shap.py
+cd ml-model
+python -m training.train_pipeline \
+    --data data/processed/home_credit_consolidated_preprocessed.csv \
+    --output models/hybrid \
+    --use-class-weights
 ```
 
-### Running the API
+### Training Options
+- `--use-class-weights`: Apply sklearn class weights (recommended)
+- `--use-focal`: Use focal loss instead of BCE
+- `--use-smote`: Apply SMOTE oversampling
+
+## 📈 Model Comparison Report
+
+See [HYBRID_BAYESIAN_MODEL_FINAL_REPORT.md](HYBRID_BAYESIAN_MODEL_FINAL_REPORT.md) for detailed analysis.
+
+## 🔐 Authentication
+
+The API uses JWT authentication. Login to get a token:
 
 ```bash
-# Start FastAPI server
-uvicorn src.inference.api:app --host 0.0.0.0 --port 8000
-
-# Test in browser
-open http://localhost:8000/docs
-
-# Health check
-curl http://localhost:8000/health
-
-# Make prediction
-curl -X POST http://localhost:8000/predict \
+curl -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"features": {"EXT_SOURCE_2": 0.6, "EXT_SOURCE_3": 0.4, "AGE_YEARS": 35}}'
+  -d '{"email": "user@example.com", "password": "password"}'
 ```
 
-See [POSTMAN_GUIDE.md](POSTMAN_GUIDE.md) for Postman testing instructions.
-
-## 📊 Models
-
-### TabNet (Primary Model)
-- Deep learning architecture with attention mechanism
-- **71% recall** at optimal threshold (0.309)
-- **0.702 AUC** on test set
-- Handles class imbalance with SMOTEENN + Class Weights
-- Trained on 99 engineered features
-
-### Bayesian Network
-- Probabilistic graphical model
-- Captures dependencies between top 20 features
-- Provides uncertainty quantification
-- Trained with structure learning (Hill Climbing + BIC)
-
-### Hybrid Ensemble
-- Combines TabNet and Bayesian Network predictions
-- Meta-learning approach with Logistic Regression
-- **0.702 AUC** on test set
-
-## 📈 Performance Metrics
-
-Current best model (TabNet Imbalance-Optimized):
-
-| Metric | Value |
-|--------|-------|
-| **Recall** | 0.71 (71% of defaults caught) |
-| **AUC** | 0.702 |
-| **Precision** | 0.13 |
-| **Optimal Threshold** | 0.309 (vs 0.5 default) |
-| **Class Balance** | SMOTEENN 30% + Weights [1.0, 5.16] |
-
-Detailed metrics available in `reports/figures/`:
-- SHAP summary plots
-- Feature importance visualizations
-- Precision-recall curves
-
-## 🔧 Configuration
-
-All paths are centralized in [src/config.py](src/config.py):
-- `Config.DATA_PROCESSED` - Preprocessed data location
-- `Config.TABNET_DIR` - TabNet models
-- `Config.REPORTS_DIR` - Generated reports
-
-Additional YAML configs in `config/`:
-- `config.yaml` - Model hyperparameters
-- `paths.yaml` - Legacy paths (deprecated)
-- `logging.yaml` - Logging configuration
-
-## ✅ Code Quality
-
-Run health check:
+Use the token in subsequent requests:
 ```bash
-python check_health.py
+curl http://localhost:8000/api/predictions/predict \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"features": {...}}'
 ```
 
-This verifies:
-- All critical paths exist
-- Models are properly saved
-- Data splits are available
-- SHAP outputs generated
-- No hardcoded paths remain
+## 📝 License
 
-## 🧪 Testing
-
-Run tests:
-
-```bash
-pytest tests/
-```
-
-## 📝 Documentation
-
-Detailed documentation is available in the `docs/` directory.
+This project is developed as part of a Final Year Project.
 
 ## 👥 Contributors
 
-- Your Name
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 🙏 Acknowledgments
-
-- Home Credit Dataset from Kaggle
-- PyTorch TabNet implementation
-- pgmpy for Bayesian Networks
+- Project Owner: Thanuja

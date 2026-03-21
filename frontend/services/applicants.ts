@@ -176,6 +176,29 @@ export const applicantService = {
       };
     }
   },
+
+  /**
+   * Add applicant to review queue with not_eligible status
+   */
+  addToQueue: async (id: string): Promise<ApiResponse<Applicant>> => {
+    try {
+      const response = await apiClient.put(`/api/applicants/${id}`, {
+        eligibility_status: 'not_eligible',
+        status: 'under_review',
+      });
+      const rawData = response.data?.data || response.data;
+      return {
+        success: true,
+        data: toCamelCase(rawData),
+        message: 'Added to review queue successfully',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to add to queue',
+      };
+    }
+  },
   
   // ==================== Eligibility Operations ====================
   

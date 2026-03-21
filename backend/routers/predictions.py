@@ -23,6 +23,13 @@ from pydantic import BaseModel, Field
 from database.client import db
 from middleware.auth import AuthMiddleware
 
+# Import credit score reasoning module
+from src.models.reasoning import (
+    evaluate_loan_application,
+    get_credit_score_rating,
+    CreditScoreRating
+)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -33,10 +40,9 @@ router = APIRouter(prefix="/api/predictions", tags=["Predictions"])
 # ============================================
 
 # Model instances (loaded at startup)
-tabnet_model = None
-bayesian_reasoner = None
+hybrid_predictor = None
 feature_names = None
-optimal_threshold = 0.5
+optimal_threshold = 0.15
 
 
 # ============================================
@@ -148,65 +154,23 @@ class EligibilityResponse(BaseModel):
 
 def load_models():
     """Load ML models at startup"""
-    global tabnet_model, bayesian_reasoner, feature_names, optimal_threshold
+    global hybrid_predictor, feature_names, optimal_threshold
     
     try:
-        from src.config import Config
-        import pandas as pd
-        import json
+        # Load the new Hybrid Bayesian Model predictor
+        from src.inference.predictor import LoanPredictor
         
-        # Load TabNet model
         try:
-            from pytorch_tabnet.tab_model import TabNetClassifier
-            tabnet_model = TabNetClassifier()
-            
-            optimized_path = Config.TABNET_OPTIMIZED
-            regular_path = Config.TABNET_MODEL
-            
-            if optimized_path.exists():
-                tabnet_model.load_model(str(optimized_path))
-                logger.info("✅ Loaded optimized TabNet model")
-            elif regular_path.exists():
-                tabnet_model.load_model(str(regular_path))
-                logger.info("✅ Loaded regular TabNet model")
-            else:
-                logger.warning("⚠️ TabNet model not found")
-                tabnet_model = None
-        except Exception as e:
-            logger.warning(f"⚠️ Could not load TabNet: {e}")
-            tabnet_model = None
-        
-        # Load feature names
-        try:
-            test_df = pd.read_parquet(Config.DATA_PROCESSED / 'test_split.parquet')
-            feature_names = test_df.drop('TARGET', axis=1).columns.tolist()
+            hybrid_predictor = LoanPredictor()
+            feature_names = hybrid_predictor.feature_names
+            optimal_threshold = hybrid_predictor.OPTIMAL_THRESHOLD
+            logger.info(f"✅ Loaded Hybrid Bayesian Model (v{hybrid_predictor.MODEL_VERSION})")
+            logger.info(f"   Architecture: BN (PGMPY) + BNN (PyTorch MC-Dropout)")
             logger.info(f"✅ Loaded {len(feature_names)} feature names")
+            logger.info(f"✅ Optimal threshold: {optimal_threshold:.3f}")
         except Exception as e:
-            logger.warning(f"⚠️ Could not load feature names: {e}")
-            feature_names = []
-        
-        # Load optimal threshold
-        try:
-            threshold_path = Config.TABNET_DIR / 'optimal_threshold.json'
-            if threshold_path.exists():
-                with open(threshold_path, 'r') as f:
-                    threshold_data = json.load(f)
-                    optimal_threshold = threshold_data.get('optimal_threshold', 0.5)
-                logger.info(f"✅ Loaded optimal threshold: {optimal_threshold:.3f}")
-        except Exception as e:
-            logger.warning(f"⚠️ Could not load threshold: {e}")
-        
-        # Load Bayesian Reasoner
-        try:
-            from src.models.bayesian_reasoner import BayesianReasoner
-            bayesian_model_path = Config.OVERALL_PROJECT_ROOT / 'ml-model' / 'models' / 'bayesian'
-            if bayesian_model_path.exists():
-                bayesian_reasoner = BayesianReasoner(str(bayesian_model_path))
-                logger.info("✅ Loaded Bayesian Reasoner for explainability")
-            else:
-                logger.warning(f"⚠️ Bayesian model not found at {bayesian_model_path}")
-        except Exception as e:
-            logger.warning(f"⚠️ Could not load Bayesian Reasoner: {e}")
+            logger.error(f"❌ Could not load hybrid model: {e}")
+            hybrid_predictor = None
         
         logger.info("🎉 Predictions router models loaded!")
         
@@ -222,77 +186,85 @@ load_models()
 # HELPER FUNCTIONS
 # ============================================
 
-# Feature name to human-readable mapping
+# Feature name to human-readable mapping (Plain English, no technical jargon)
 FEATURE_TRANSLATIONS = {
-    'EXT_SOURCE_1': 'Credit Bureau Score',
-    'EXT_SOURCE_2': 'Bank Repayment History',
-    'EXT_SOURCE_3': 'Financial Reliability Score',
+    'EXT_SOURCE_1': 'Credit History',
+    'EXT_SOURCE_2': 'Payment Track Record',
+    'EXT_SOURCE_3': 'Financial Trustworthiness',
     'EXT_SOURCE_MEAN': 'Overall Credit Standing',
     'EXT_SOURCE_STD': 'Credit Score Consistency',
-    'DAYS_LAST_PHONE_CHANGE': 'Contact Information Stability',
-    'inst_AMT_PAYMENT_min': 'Minimum Monthly Installment',
-    'DAYS_EMPLOYED': 'Employment Duration',
+    'DAYS_LAST_PHONE_CHANGE': 'Contact Stability',
+    'inst_AMT_PAYMENT_min': 'Monthly Payment Amount',
+    'DAYS_EMPLOYED': 'Job Stability',
     'DAYS_BIRTH': 'Age',
     'AGE_YEARS': 'Age',
-    'CREDIT_INCOME_RATIO': 'Loan-to-Income Ratio',
-    'ANNUITY_INCOME_RATIO': 'Monthly Payment Burden',
+    'CREDIT_INCOME_RATIO': 'Loan Size vs Income',
+    'ANNUITY_INCOME_RATIO': 'Monthly Payment vs Salary',
     'AMT_CREDIT': 'Loan Amount',
     'AMT_INCOME_TOTAL': 'Annual Income',
     'AMT_ANNUITY': 'Monthly Payment',
     'CODE_GENDER': 'Gender',
-    'NAME_EDUCATION_TYPE': 'Education Level',
-    'REGION_RATING_CLIENT': 'Regional Economic Rating',
-    'REG_CITY_NOT_WORK_CITY': 'Work-Residence Distance',
-    'bureau_DAYS_CREDIT_max': 'Oldest Credit Account Age',
-    'bureau_DAYS_CREDIT_min': 'Newest Credit Account Age',
-    'bureau_DAYS_CREDIT_mean': 'Average Credit History Length',
-    'bureau_AMT_CREDIT_SUM_DEBT_mean': 'Existing Debt Amount',
-    'inst_DAYS_INSTALMENT_min': 'Payment Timeliness',
-    'prev_DAYS_DECISION_min': 'Recent Loan Applications',
-    'prev_DAYS_DECISION_mean': 'Average Loan Application History',
+    'NAME_EDUCATION_TYPE': 'Education',
+    'REGION_RATING_CLIENT': 'Living Area',
+    'REG_CITY_NOT_WORK_CITY': 'Work Location',
+    'bureau_DAYS_CREDIT_max': 'Credit History Length',
+    'bureau_DAYS_CREDIT_min': 'Recent Credit Activity',
+    'bureau_DAYS_CREDIT_mean': 'Credit Experience',
+    'bureau_AMT_CREDIT_SUM_DEBT_mean': 'Existing Loans',
+    'inst_DAYS_INSTALMENT_min': 'Payment Habits',
+    'prev_DAYS_DECISION_min': 'Past Loan Applications',
+    'prev_DAYS_DECISION_mean': 'Borrowing History',
+    # Additional simplified names
+    'sk_bureau_DAYS_CREDIT_min': 'Credit Account Age',
+    'sk_bureau_DAYS_CREDIT_max': 'Oldest Credit Account',
+    'bb_MONTHS_BALANCE_min': 'Bank Account History',
+    'prev_SK_ID_PREV_count': 'Past Applications',
+    'prev_AMT_CREDIT_min': 'Previous Loan Amounts',
+    'FLAG_OWN_CAR': 'Vehicle Ownership',
+    'FLAG_OWN_REALTY': 'Property Ownership',
 }
 
-# Human-readable explanations for risk factors
+# Human-readable explanations for risk factors (Plain English for everyday people)
 RISK_EXPLANATIONS = {
     'EXT_SOURCE_1': {
-        'low': 'The credit bureau score indicates a history of missed or late payments, suggesting the applicant may have difficulty repaying loans.',
-        'medium': 'The credit bureau score is moderate, showing some past credit issues but not severe concerns.',
-        'high': 'The credit bureau score is excellent, indicating a strong history of timely repayments.'
+        'low': 'Your credit history shows some missed or late payments in the past.',
+        'medium': 'Your credit history is okay, with a few minor issues.',
+        'high': 'Your credit history is excellent - you always pay on time!'
     },
     'EXT_SOURCE_2': {
-        'low': 'Bank records show inconsistent repayment behavior, which increases the likelihood of loan default.',
-        'medium': 'Bank repayment history is acceptable but shows occasional delays in payments.',
-        'high': 'Bank repayment history is excellent, demonstrating reliable financial behavior.'
+        'low': 'Bank records show you may have struggled with payments before.',
+        'medium': 'Your bank payment history is average - mostly on time.',
+        'high': 'Your bank payment history is great - very reliable!'
     },
     'EXT_SOURCE_3': {
-        'low': 'The overall financial reliability assessment indicates significant risk in loan repayment.',
-        'medium': 'Financial reliability is moderate, with some areas of concern.',
-        'high': 'Financial reliability is strong, indicating a trustworthy borrower.'
+        'low': 'Overall, the financial check shows some concerns about paying back this loan.',
+        'medium': 'The financial check shows you are a moderate risk borrower.',
+        'high': 'The financial check shows you are a very trustworthy borrower!'
     },
     'EXT_SOURCE_MEAN': {
-        'low': 'The combined credit assessment shows poor overall creditworthiness.',
-        'medium': 'The combined credit assessment is moderate, requiring careful consideration.',
-        'high': 'The combined credit assessment is excellent, supporting loan approval.'
+        'low': 'Looking at all credit checks together, there are some concerns.',
+        'medium': 'Your overall credit standing is average.',
+        'high': 'Your overall credit standing is excellent!'
     },
     'DAYS_LAST_PHONE_CHANGE': {
-        'low': 'Recent changes to contact information suggest instability, which is a minor risk indicator.',
-        'medium': 'Contact information has been moderately stable.',
-        'high': 'Contact information has been very stable, indicating a settled lifestyle.'
+        'low': 'You recently changed your phone number, which can be a minor concern.',
+        'medium': 'Your contact details have been fairly stable.',
+        'high': 'Your contact details have been stable for a long time - that is good!'
     },
     'inst_AMT_PAYMENT_min': {
-        'low': 'The required monthly payment is manageable relative to income.',
-        'medium': 'The monthly payment represents a moderate portion of income.',
-        'high': 'The monthly payment is high relative to income, which may strain the applicant\'s finances.'
+        'low': 'The monthly payment amount is affordable for you.',
+        'medium': 'The monthly payment takes up a fair portion of your income.',
+        'high': 'The monthly payment is quite high compared to what you earn.'
     },
     'CREDIT_INCOME_RATIO': {
-        'low': 'The loan amount is reasonable compared to the applicant\'s income.',
-        'medium': 'The loan amount is moderate relative to income.',
-        'high': 'The loan amount is very high compared to the applicant\'s income, creating significant repayment risk.'
+        'low': 'The loan amount is reasonable compared to what you earn.',
+        'medium': 'The loan amount is moderate compared to your income.',
+        'high': 'The loan amount is very high compared to what you earn - this is a concern.'
     },
     'ANNUITY_INCOME_RATIO': {
-        'low': 'Monthly payments are affordable based on the applicant\'s income.',
-        'medium': 'Monthly payments represent a moderate burden on the applicant\'s income.',
-        'high': 'Monthly payments would consume a large portion of income, making repayment difficult.'
+        'low': 'Your monthly payments will be easy to manage with your salary.',
+        'medium': 'Your monthly payments will take up a fair amount of your salary.',
+        'high': 'Your monthly payments would use up too much of your salary.'
     }
 }
 
@@ -301,14 +273,18 @@ DEFAULT_INTEREST_RATE = 12.0  # 12% per annum
 
 
 def get_risk_level(probability: float) -> str:
-    """Get risk level string from probability"""
-    if probability < 0.2:
+    """Get risk level string from probability.
+    
+    Note: In our model, higher probability = more likely to be APPROVED.
+    So high probability = low risk, low probability = high risk.
+    """
+    if probability >= 0.8:
         return "Very Low Risk"
-    elif probability < 0.35:
+    elif probability >= 0.65:
         return "Low Risk"
-    elif probability < 0.5:
+    elif probability >= 0.5:
         return "Medium Risk"
-    elif probability < 0.7:
+    elif probability >= 0.35:
         return "High Risk"
     else:
         return "Very High Risk"
@@ -325,57 +301,59 @@ def get_risk_explanation(feature_name: str, discretized_value: int, influence_di
     The explanation must be CONSISTENT with the influence_direction:
     - If 'increases_risk' (concern), explain why it's a problem
     - If 'decreases_risk' (positive), explain why it's good
+    
+    Uses simple, everyday language that anyone can understand.
     """
     human_name = translate_feature_name(feature_name)
     
-    # For CONCERNS (increases_risk) - explain why this factor is worrying
+    # For CONCERNS (increases_risk) - explain why this factor is worrying in plain English
     if influence_direction == 'increases_risk':
         concern_explanations = {
-            'EXT_SOURCE_1': "The credit bureau score is lower than expected, indicating past credit issues.",
-            'EXT_SOURCE_2': "External credit assessment shows concerning patterns in credit behavior.",
-            'EXT_SOURCE_3': "Third-party risk assessment indicates elevated risk for this applicant.",
-            'DAYS_LAST_PHONE_CHANGE': "Recent changes to phone number may indicate instability or possible fraud concerns.",
-            'sk_bureau_DAYS_CREDIT_min': "The credit account history is shorter than preferred, limiting risk assessment ability.",
-            'sk_bureau_DAYS_CREDIT_max': "The longest credit relationship is recent, showing limited track record.",
-            'inst_AMT_PAYMENT_min': "The payment history shows lower than expected payment amounts in the past.",
-            'bb_MONTHS_BALANCE_min': "Recent bank balance history shows concerning patterns.",
-            'prev_SK_ID_PREV_count': "The number of previous applications raises questions about credit seeking behavior.",
-            'prev_AMT_CREDIT_min': "Previous credit amounts suggest a pattern that increases default risk.",
-            'CREDIT_INCOME_RATIO': "The ratio of credit to income is high, creating potential repayment strain.",
-            'ANNUITY_INCOME_RATIO': "Monthly payment obligations are high relative to income.",
-            'DAYS_EMPLOYED': "Employment duration is shorter than preferred for this loan amount.",
-            'DAYS_BIRTH': "Age profile suggests higher risk based on historical patterns.",
-            'FLAG_OWN_CAR': "Lack of vehicle ownership may indicate limited asset base.",
-            'FLAG_OWN_REALTY': "Lack of property ownership may indicate limited financial stability."
+            'EXT_SOURCE_1': "Your credit history shows some past payment problems.",
+            'EXT_SOURCE_2': "Your bank payment records show some late or missed payments.",
+            'EXT_SOURCE_3': "The financial check shows some concerns about paying back loans.",
+            'DAYS_LAST_PHONE_CHANGE': "You recently changed your phone number, which can suggest instability.",
+            'sk_bureau_DAYS_CREDIT_min': "You don't have a long credit history yet.",
+            'sk_bureau_DAYS_CREDIT_max': "Your credit accounts are relatively new.",
+            'inst_AMT_PAYMENT_min': "Your past payments have been smaller than expected.",
+            'bb_MONTHS_BALANCE_min': "Your bank account history shows some concerning patterns.",
+            'prev_SK_ID_PREV_count': "You've applied for several loans before, which can be a concern.",
+            'prev_AMT_CREDIT_min': "Your past borrowing pattern shows higher risk.",
+            'CREDIT_INCOME_RATIO': "The loan amount is high compared to what you earn.",
+            'ANNUITY_INCOME_RATIO': "The monthly payments would be difficult to afford with your income.",
+            'DAYS_EMPLOYED': "You haven't been at your current job for very long.",
+            'DAYS_BIRTH': "Your age group tends to have more difficulty with loan repayments.",
+            'FLAG_OWN_CAR': "Not owning a vehicle means you have fewer assets.",
+            'FLAG_OWN_REALTY': "Not owning property means you have fewer assets as security."
         }
         return concern_explanations.get(
             feature_name, 
-            f"The {human_name.lower()} indicates elevated risk for this application."
+            f"Your {human_name.lower()} raises some concerns for this loan."
         )
     
-    # For POSITIVE FACTORS (decreases_risk) - explain why this factor is good
+    # For POSITIVE FACTORS (decreases_risk) - explain why this factor is good in plain English
     else:
         positive_explanations = {
-            'EXT_SOURCE_1': "The credit bureau score is excellent, indicating a strong history of timely repayments.",
-            'EXT_SOURCE_2': "External credit assessment shows reliable credit behavior.",
-            'EXT_SOURCE_3': "Third-party risk assessment indicates low risk for this applicant.",
-            'DAYS_LAST_PHONE_CHANGE': "Stable contact information over time indicates reliability.",
-            'sk_bureau_DAYS_CREDIT_min': "Established credit history demonstrates experience with credit management.",
-            'sk_bureau_DAYS_CREDIT_max': "Long-standing credit relationships show financial stability.",
-            'inst_AMT_PAYMENT_min': "Payment history shows consistent and reliable payment behavior.",
-            'bb_MONTHS_BALANCE_min': "Bank balance history shows healthy financial patterns.",
-            'prev_SK_ID_PREV_count': "Previous credit applications were managed responsibly.",
-            'prev_AMT_CREDIT_min': "Previous credit history indicates responsible borrowing.",
-            'CREDIT_INCOME_RATIO': "The loan amount is reasonable compared to income.",
-            'ANNUITY_INCOME_RATIO': "Monthly payments are well within affordable limits.",
-            'DAYS_EMPLOYED': "Stable employment history supports repayment capacity.",
-            'DAYS_BIRTH': "Age profile suggests financial maturity and stability.",
-            'FLAG_OWN_CAR': "Vehicle ownership indicates financial responsibility.",
-            'FLAG_OWN_REALTY': "Property ownership indicates strong financial foundation."
+            'EXT_SOURCE_1': "Your credit history is excellent - you always pay on time!",
+            'EXT_SOURCE_2': "Your bank payment records show you're very reliable.",
+            'EXT_SOURCE_3': "The financial check shows you're a trustworthy borrower.",
+            'DAYS_LAST_PHONE_CHANGE': "Your contact details have been stable, showing reliability.",
+            'sk_bureau_DAYS_CREDIT_min': "You have good experience managing credit.",
+            'sk_bureau_DAYS_CREDIT_max': "You've had credit accounts for a long time, showing stability.",
+            'inst_AMT_PAYMENT_min': "You have a good track record of making payments.",
+            'bb_MONTHS_BALANCE_min': "Your bank account history looks healthy.",
+            'prev_SK_ID_PREV_count': "You've managed your previous loans responsibly.",
+            'prev_AMT_CREDIT_min': "Your past borrowing shows responsible behavior.",
+            'CREDIT_INCOME_RATIO': "The loan amount is reasonable for your income level.",
+            'ANNUITY_INCOME_RATIO': "You can easily afford the monthly payments.",
+            'DAYS_EMPLOYED': "You've been at your job for a good amount of time.",
+            'DAYS_BIRTH': "Your age shows financial maturity and stability.",
+            'FLAG_OWN_CAR': "Owning a vehicle shows you're financially responsible.",
+            'FLAG_OWN_REALTY': "Owning property gives you a strong financial foundation."
         }
         return positive_explanations.get(
             feature_name, 
-            f"The {human_name.lower()} is favorable for this application."
+            f"Your {human_name.lower()} is a positive point for this loan."
         )
 
 
@@ -401,60 +379,42 @@ def generate_human_summary(
     risk_factors: List[Dict],
     protective_factors: List[Dict]
 ) -> str:
-    """Generate a human-friendly summary explanation"""
-    
-    risk_percent = probability * 100
-    
-    # Base explanation about what default means
-    default_explanation = "Default means the customer may fail to repay the loan on time or in full."
+    """Generate a simple, human-friendly summary explanation"""
     
     if eligible:
-        # APPROVED case
-        summary = f"**APPROVED**: Based on the comprehensive financial analysis, this loan application has been approved. "
-        summary += f"The system estimates a {risk_percent:.1f}% probability of repayment difficulty, which is within acceptable limits. "
+        summary = "Good News - Loan Approved. "
+        summary += "We have reviewed your application and you qualify for this loan. "
         
-        # Explain why approved
         if loan_to_income_ratio < 2:
-            summary += f"The requested loan amount ({format_currency(loan_amount)}) is reasonable at {loan_to_income_ratio:.1f}x the applicant's annual income. "
+            summary += f"The loan amount of {format_currency(loan_amount)} is reasonable for your income level. "
         
         if payment_to_income_ratio < 0.3:
-            summary += f"Monthly payments would only consume {payment_to_income_ratio*100:.1f}% of monthly income, which is affordable. "
-        
-        # Add protective factors
-        if protective_factors:
-            summary += "Positive factors include: "
-            positives = []
-            for pf in protective_factors[:2]:
-                human_name = translate_feature_name(pf.get('feature_name', ''))
-                positives.append(human_name.lower())
-            summary += ", ".join(positives) + ". "
+            payment_percent = int(payment_to_income_ratio * 100)
+            summary += f"Your monthly payments will be about {payment_percent}% of your income, which is very manageable. "
+        elif payment_to_income_ratio < 0.4:
+            payment_percent = int(payment_to_income_ratio * 100)
+            summary += f"Your monthly payments will be about {payment_percent}% of your income. "
         
     else:
-        # REJECTED case
-        summary = f"**REJECTED**: Based on the comprehensive financial analysis, this loan application cannot be approved at this time. "
-        summary += f"The system estimates a {risk_percent:.1f}% probability of repayment difficulty. {default_explanation} "
+        summary = "Loan Not Approved. "
+        summary += "We are sorry, but we cannot approve this loan at this time. "
         
-        # Explain the main concerns
         concerns = []
         
         if loan_to_income_ratio > 5:
-            concerns.append(f"the requested loan amount ({format_currency(loan_amount)}) is {loan_to_income_ratio:.1f}x the applicant's annual income, which is extremely high")
+            concerns.append(f"the loan amount ({format_currency(loan_amount)}) is too large for your current income")
         elif loan_to_income_ratio > 2:
-            concerns.append(f"the loan amount relative to income ({loan_to_income_ratio:.1f}x annual income) is elevated")
+            concerns.append(f"the loan amount is high compared to your income")
         
         if payment_to_income_ratio > 0.5:
-            concerns.append(f"monthly payments would consume {payment_to_income_ratio*100:.1f}% of monthly income, making repayment unsustainable")
+            concerns.append(f"the monthly payments would take more than half your salary")
         elif payment_to_income_ratio > 0.4:
-            concerns.append(f"monthly payments ({payment_to_income_ratio*100:.1f}% of income) are high")
-        
-        # Add risk factors from model
-        for rf in risk_factors[:2]:
-            human_name = translate_feature_name(rf.get('feature_name', ''))
-            if 'credit' in human_name.lower() or 'score' in human_name.lower():
-                concerns.append(f"the {human_name.lower()} indicates past repayment issues")
+            concerns.append(f"the monthly payments would be difficult to manage")
         
         if concerns:
-            summary += "The main concerns are: " + "; ".join(concerns) + ". "
+            summary += "Here is why: " + "; ".join(concerns) + ". "
+        
+        summary += "You may want to try a smaller loan amount or work on improving your credit score first."
     
     return summary
 
@@ -470,106 +430,97 @@ def generate_smart_recommendations(
     payment_to_income_ratio: float,
     risk_factors: List[Dict]
 ) -> List[str]:
-    """Generate dynamic, data-driven recommendations based on eligibility"""
+    """Generate simple, practical recommendations"""
     
     recommendations = []
     
     if eligible:
-        # APPROVED - no fixes needed
-        recommendations.append("The applicant meets all financial and credit requirements for this loan.")
-        recommendations.append("No corrective actions are required.")
-        recommendations.append("The loan can proceed to documentation and disbursement stages.")
+        recommendations.append("Great news! You qualify for this loan.")
+        recommendations.append("You can now proceed to complete the paperwork.")
+        recommendations.append("Keep making timely payments to maintain your good credit standing.")
         
         if loan_to_income_ratio < 1 and payment_to_income_ratio < 0.2:
-            recommendations.append("Given the strong financial position, consider offering the applicant a higher credit limit for future needs.")
+            recommendations.append("Your strong financial position may qualify you for better rates in the future.")
     else:
-        # REJECTED - provide specific improvement advice
+        max_affordable_payment = monthly_income * 0.4
+        safe_loan_amount = annual_income * 3
         
-        # Calculate suggested improvements
-        max_affordable_payment = monthly_income * 0.4  # 40% of income
-        max_affordable_loan_current = max_affordable_payment * loan_term_months
-        max_affordable_loan_long = max_affordable_payment * 60  # 5 years
-        max_affordable_loan_very_long = max_affordable_payment * 120  # 10 years
-        safe_loan_amount = annual_income * 3  # 3x annual income
-        
-        # Check if loan amount is too high relative to income
         if loan_to_income_ratio > 3:
             recommendations.append(
-                f"Reduce the requested loan amount. Based on the applicant's income, a loan up to {format_currency(safe_loan_amount)} would be more appropriate."
+                f"Consider a smaller loan amount. Based on your income, you could afford up to {format_currency(safe_loan_amount)}."
             )
         
-        # Check if monthly payment is too high
         if payment_to_income_ratio > 0.4:
-            # Only suggest extending term if not already at max
             if loan_term_months < 60:
                 recommendations.append(
-                    f"Extend the repayment period to 60 months (5 years). This would make payments more affordable at {format_currency(max_affordable_payment)} per month."
+                    "Spread payments over a longer period (such as 60 months) to make them more affordable."
                 )
             elif loan_term_months < 120:
-                # Already at 60 months, suggest even longer term
                 recommendations.append(
-                    f"Consider extending to a 120-month (10-year) term to reduce monthly payments. Current {loan_term_months}-month term creates high payments."
+                    "Consider a 10-year repayment plan to lower your monthly payments."
                 )
             else:
-                # Already at max term, must reduce amount
+                max_affordable_loan_very_long = max_affordable_payment * 120
                 recommendations.append(
-                    f"The loan amount is too high even with the maximum term. Consider reducing to {format_currency(max_affordable_loan_very_long)} or less."
-                )
-            
-            # Add specific advice about current term creating unaffordable payments
-            if loan_term_months <= 24:
-                recommendations.append(
-                    f"Current {loan_term_months}-month term creates unaffordable payments. Consider extending to at least 36 months."
-                )
-            elif loan_term_months <= 48 and loan_term_months < 60:
-                recommendations.append(
-                    f"Current {loan_term_months}-month term results in high payments. A 60-month term would be more manageable."
+                    f"The loan amount is too large. Consider reducing it to {format_currency(max_affordable_loan_very_long)} or less."
                 )
         
-        # Check for credit-related risk factors
         for rf in risk_factors:
             feature = rf.get('feature_name', '')
-            if 'EXT_SOURCE' in feature or 'CREDIT' in feature.upper():
+            if 'credit' in feature.lower() or 'cibil' in feature.lower():
                 recommendations.append(
-                    "Improve credit standing by paying off existing debts and maintaining timely payments for 6-12 months before reapplying."
+                    "Work on improving your credit score by paying bills on time for 6-12 months."
                 )
                 break
         
         if loan_amount > annual_income * 5:
             recommendations.append(
-                "Consider adding a co-borrower or guarantor with additional income to support this loan amount."
+                "You could apply with a family member or friend as a co-borrower to strengthen your application."
             )
         
         recommendations.append(
-            "The applicant may reapply after addressing these concerns or with a modified loan request."
+            "You can apply again after making these improvements or with a smaller loan amount."
         )
     
     return recommendations[:5]
 
 
 def humanize_risk_factors(factors: List[Dict], is_positive: bool = False) -> List[Dict]:
-    """Convert technical risk factors to human-readable format
-    
-    Args:
-        factors: List of factor dictionaries from the model
-        is_positive: If True, these are positive/protective factors (reduces risk)
-                     If False, these are concern factors (increases risk)
-    """
+    """Convert technical factors to human-readable format"""
     humanized = []
+    
+    # Clear, simple explanations for each factor type
+    positive_explanations = {
+        'cibil_score': 'Your credit score is a positive point for this loan.',
+        'loan_to_income_ratio': 'Your loan to income ratio is a positive point for this loan.',
+        'total_assets': 'Your total assets is a positive point for this loan.',
+        'payment_to_income_ratio': 'Your payment to income ratio is a positive point for this loan.',
+        'income_annum': 'Your annual income is a positive point for this loan.',
+        'loan_amount': 'Your requested loan amount is reasonable for your profile.'
+    }
+    
+    concern_explanations = {
+        'cibil_score': 'Your credit score raises some concerns for this loan.',
+        'loan_to_income_ratio': 'Your loan to income ratio raises some concerns for this loan.',
+        'total_assets': 'Your total assets raises some concerns for this loan.',
+        'payment_to_income_ratio': 'Your payment to income ratio raises some concerns for this loan.',
+        'income_annum': 'Your annual income level raises some concerns for this loan.',
+        'loan_amount': 'Your requested loan amount is high relative to your financial profile.'
+    }
     
     for factor in factors:
         technical_name = factor.get('feature_name', '')
-        discretized = factor.get('discretized_value', 1)
         
-        # Determine direction based on context (is_positive flag)
-        # This ensures consistency regardless of what the raw data says
-        direction = 'decreases_risk' if is_positive else 'increases_risk'
+        if is_positive:
+            explanation = positive_explanations.get(technical_name, 
+                f'Your {technical_name.replace("_", " ")} is a positive point for this loan.')
+        else:
+            explanation = concern_explanations.get(technical_name,
+                f'Your {technical_name.replace("_", " ")} raises some concerns for this loan.')
         
         humanized.append({
-            'factor': translate_feature_name(technical_name),
-            'impact': 'Reduces Risk' if is_positive else 'Increases Risk',
-            'severity': 'High' if discretized == 2 else ('Moderate' if discretized == 1 else 'Low'),
-            'explanation': get_risk_explanation(technical_name, discretized, direction)
+            'factor': technical_name.replace('_', ' ').title(),
+            'explanation': explanation
         })
     
     return humanized
@@ -622,26 +573,22 @@ async def create_prediction(
     - Risk level
     - Decision (APPROVE/REJECT)
     """
-    if tabnet_model is None:
+    if hybrid_predictor is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="TabNet model not loaded"
+            detail="Model not loaded"
         )
     
     try:
-        # Prepare features
-        X = prepare_features_array(request.features)
-        
-        # Get prediction from TabNet
-        probability = float(tabnet_model.predict_proba(X)[0, 1])
-        prediction = 1 if probability > optimal_threshold else 0
+        # Get prediction from hybrid model
+        result = hybrid_predictor.predict(request.features)
         
         return PredictionResponse(
-            prediction=prediction,
-            probability=round(probability, 4),
-            risk_level=get_risk_level(probability),
-            decision="REJECT" if prediction == 1 else "APPROVE",
-            threshold_used=round(optimal_threshold, 3)
+            prediction=result['prediction'],
+            probability=result['probability'],
+            risk_level=result['risk_level'],
+            decision="REJECT" if result['prediction'] == 1 else "APPROVE",
+            threshold_used=result['threshold_used']
         )
         
     except Exception as e:
@@ -658,82 +605,74 @@ async def predict_with_explanation(
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
     """
-    Create prediction with full Bayesian Network reasoning
+    Create prediction with full reasoning and explanation
     
     **Access**: Loan Officers and Managers
     
-    The hybrid model combines:
-    - **TabNet**: Deep learning for accurate probability estimation
-    - **Bayesian Network**: Probabilistic reasoning for explainability
+    The Hybrid Bayesian Model combines:
+    - **Bayesian Network (PGMPY)**: Causal structure learning & risk embeddings
+    - **Bayesian Neural Network (PyTorch)**: MC-Dropout for uncertainty quantification
+    - **ELBO Loss**: BCE + KL Divergence with class weights
     
     Returns:
     - Prediction and probability
-    - Risk factors with explanations (e.g., "External credit score is low, which increases default risk")
-    - Protective factors
-    - Inference paths showing how features influence the decision
-    - Natural language summary explanation
-    - Confidence score
+    - Risk factors with explanations
+    - Recommendations
+    - Confidence score with uncertainty estimates
     """
+    if hybrid_predictor is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Model not loaded"
+        )
+    
     try:
-        # Get TabNet probability if available
-        tabnet_probability = None
-        if tabnet_model is not None:
-            X = prepare_features_array(request.features)
-            tabnet_probability = float(tabnet_model.predict_proba(X)[0, 1])
+        # Get full explanation from hybrid model
+        result = hybrid_predictor.explain(request.features)
         
-        # Get Bayesian reasoning
-        if bayesian_reasoner is not None:
-            from src.models.bayesian_reasoner import reasoning_to_dict
-            reasoning = bayesian_reasoner.get_reasoning(
-                features=request.features,
-                threshold=optimal_threshold
-            )
-            reasoning_dict = reasoning_to_dict(reasoning)
-            
-            # Combine with TabNet for hybrid model
-            if tabnet_probability is not None:
-                hybrid_probability = (tabnet_probability + reasoning_dict['probability']) / 2
-                reasoning_dict['tabnet_probability'] = round(tabnet_probability, 4)
-                reasoning_dict['bayesian_probability'] = reasoning_dict['probability']
-                reasoning_dict['probability'] = round(hybrid_probability, 4)
-                reasoning_dict['prediction'] = 1 if hybrid_probability > optimal_threshold else 0
-                reasoning_dict['decision'] = "REJECT" if reasoning_dict['prediction'] == 1 else "APPROVE"
-                reasoning_dict['risk_level'] = get_risk_level(hybrid_probability)
-            
-            reasoning_dict['model_type'] = "Hybrid TabNet + Bayesian Network"
-            
-            return {
-                "success": True,
-                "reasoning": reasoning_dict
-            }
+        # Format risk factors for display
+        risk_factors = []
+        protective_factors = []
         
-        elif tabnet_model is not None:
-            # Fallback: TabNet only with basic explanation
-            prediction = 1 if tabnet_probability > optimal_threshold else 0
-            
-            return {
-                "success": True,
-                "reasoning": {
-                    "prediction": prediction,
-                    "probability": round(tabnet_probability, 4),
-                    "risk_level": get_risk_level(tabnet_probability),
-                    "decision": "REJECT" if prediction == 1 else "APPROVE",
-                    "summary_explanation": f"The applicant has a {tabnet_probability:.1%} probability of default. " +
-                                         ("High risk - recommend rejection." if prediction == 1 else "Low risk - recommend approval."),
-                    "top_risk_factors": [],
-                    "top_protective_factors": [],
-                    "inference_paths": [],
-                    "detailed_explanation": "Full Bayesian reasoning not available. Using TabNet prediction only.",
-                    "confidence_score": 0.7,
-                    "evidence_strength": "Moderate",
-                    "model_type": "TabNet Only"
-                }
+        for factor in result.get('top_factors', []):
+            factor_info = {
+                'feature_name': factor['feature'],
+                'importance': factor['importance'],
+                'feature_value': factor.get('value', 0),
+                'discretized_value': 1,
+                'influence_direction': 'increases_risk',
+                'influence_strength': factor['importance'],
+                'conditional_probability': result['probability'],
+                'explanation': get_risk_explanation(factor['feature'], 1, 'increases_risk')
             }
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="No ML models available"
-            )
+            
+            # Classify based on influence
+            if result['prediction'] == 1:
+                risk_factors.append(factor_info)
+            else:
+                factor_info['influence_direction'] = 'decreases_risk'
+                factor_info['explanation'] = get_risk_explanation(factor['feature'], 1, 'decreases_risk')
+                protective_factors.append(factor_info)
+        
+        reasoning_dict = {
+            "prediction": result['prediction'],
+            "probability": result['probability'],
+            "risk_level": result['risk_level'],
+            "decision": result['decision'],
+            "summary_explanation": result['message'],
+            "top_risk_factors": risk_factors[:3],
+            "top_protective_factors": protective_factors[:3],
+            "inference_paths": [],
+            "detailed_explanation": result.get('recommendation', ''),
+            "confidence_score": result.get('confidence', 95.0) / 100,
+            "evidence_strength": "High" if result.get('confidence', 95) > 80 else "Moderate",
+            "model_type": "Hybrid Bayesian (BN + BNN with MC-Dropout)"
+        }
+        
+        return {
+            "success": True,
+            "reasoning": reasoning_dict
+        }
             
     except HTTPException:
         raise
@@ -758,9 +697,15 @@ async def check_eligibility(
     This endpoint:
     1. Retrieves applicant data from the database
     2. Prepares features for the hybrid ML model
-    3. Runs prediction through TabNet + Bayesian Network
+    3. Runs prediction through GradientBoost + Bayesian
     4. Returns eligibility decision with full reasoning
     """
+    if hybrid_predictor is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Model not loaded"
+        )
+    
     try:
         # Get applicant from database
         applicant = db.get_applicant_by_id(request.applicant_id)
@@ -777,50 +722,113 @@ async def check_eligibility(
         monthly_payment = request.loan_amount / request.loan_term_months
         payment_to_income_ratio = monthly_payment / monthly_income if monthly_income > 0 else 999
         
-        # Prepare features from applicant data - model will decide based on these
-        features = prepare_applicant_features(applicant, request.loan_amount, request.loan_term_months)
+        # Prepare features from applicant data using predictor's method
+        features = hybrid_predictor.prepare_features_from_applicant(
+            applicant, request.loan_amount, request.loan_term_months
+        )
         
-        # Get prediction with reasoning
-        tabnet_probability = None
-        if tabnet_model is not None:
-            X = prepare_features_array(features)
-            tabnet_probability = float(tabnet_model.predict_proba(X)[0, 1])
+        # Get prediction with explanation from hybrid model
+        result = hybrid_predictor.explain(features)
         
-        # Get Bayesian reasoning
+        probability = result['probability']
+        prediction = result['prediction']
+        confidence_score = result.get('confidence', 95.0) / 100
+        summary_explanation = result.get('message', '')
+        
+        # Format risk/protective factors
         risk_factors = []
         protective_factors = []
-        summary_explanation = ""
-        confidence_score = 0.5
         
-        if bayesian_reasoner is not None:
-            from src.models.bayesian_reasoner import reasoning_to_dict
-            reasoning = bayesian_reasoner.get_reasoning(features, optimal_threshold)
-            reasoning_dict = reasoning_to_dict(reasoning)
-            
-            risk_factors = reasoning_dict.get('top_risk_factors', [])
-            protective_factors = reasoning_dict.get('top_protective_factors', [])
-            summary_explanation = reasoning_dict.get('summary_explanation', '')
-            confidence_score = reasoning_dict.get('confidence_score', 0.5)
-            
-            bayesian_probability = reasoning_dict.get('probability', 0.5)
-            
-            if tabnet_probability is not None:
-                probability = (tabnet_probability + bayesian_probability) / 2
+        for factor in result.get('top_factors', []):
+            factor_info = {
+                'feature_name': factor['feature'],
+                'importance': factor['importance'],
+                'explanation': get_risk_explanation(factor['feature'], 1, 
+                    'decreases_risk' if prediction == 1 else 'increases_risk')
+            }
+            # prediction=1 means APPROVED, so factors are protective
+            # prediction=0 means REJECTED, so factors are risks
+            if prediction == 1:
+                protective_factors.append(factor_info)
             else:
-                probability = bayesian_probability
-        elif tabnet_probability is not None:
-            probability = tabnet_probability
-            summary_explanation = f"Based on the ML model analysis, the applicant has a {probability:.1%} probability of default."
-        else:
-            # Fallback heuristic
-            probability = 0.5
-            summary_explanation = "ML models not available. Using default assessment."
+                risk_factors.append(factor_info)
         
         # Determine eligibility
-        prediction = 1 if probability > optimal_threshold else 0
-        eligible = prediction == 0
+        # Note: Model trained with Approved=1, Rejected=0
+        # So prediction=1 means eligible, prediction=0 means not eligible
+        eligible = prediction == 1
         decision = "APPROVE" if eligible else "REJECT"
         risk_level = get_risk_level(probability)
+        
+        # Get credit score from applicant data
+        applicant_credit_score = applicant.get('credit_score', 650)
+        
+        # Use the new reasoning module for multi-factor analysis
+        try:
+            loan_reasoning = evaluate_loan_application(
+                model_probability=probability,
+                loan_amount=request.loan_amount,
+                monthly_income=monthly_income,
+                loan_term_months=request.loan_term_months,
+                credit_score=applicant_credit_score
+            )
+            
+            # Extract credit score info with proper classification
+            credit_score_info = {
+                "score": loan_reasoning.credit_score.score,
+                "rating": loan_reasoning.credit_score.rating.value,
+                "description": loan_reasoning.credit_score.description,
+                "rating_scale": {
+                    "Poor": "Below 580",
+                    "Fair": "580-669",
+                    "Good": "670-739",
+                    "Very Good": "740-799",
+                    "Exceptional": "800+"
+                }
+            }
+            
+            # Extract actionable suggestions from reasoning
+            actionable_suggestions = [
+                {
+                    "action": s.action,
+                    "reason": s.reason,
+                    "expected_improvement": s.expected_improvement
+                }
+                for s in loan_reasoning.suggestions
+            ]
+            
+            # Extract risk factors from reasoning
+            detailed_risk_factors = [
+                {
+                    "factor": rf.name,
+                    "severity": rf.severity,
+                    "impact": rf.impact,
+                    "description": rf.description
+                }
+                for rf in loan_reasoning.risk_factors
+            ]
+            
+            # Get alternative offer if rejected
+            alternative_offer = None
+            if not eligible and loan_reasoning.alternative_amount:
+                alternative_offer = {
+                    "suggested_amount": loan_reasoning.alternative_amount,
+                    "suggested_amount_formatted": format_currency(loan_reasoning.alternative_amount),
+                    "suggested_term_months": loan_reasoning.alternative_term or request.loan_term_months,
+                    "reason": "Based on your income and credit profile, this amount may be more appropriate."
+                }
+            
+        except Exception as reasoning_error:
+            logger.warning(f"Reasoning module error: {reasoning_error}")
+            # Fallback to basic credit score classification
+            credit_score_info = {
+                "score": applicant_credit_score,
+                "rating": get_credit_score_rating(applicant_credit_score).value,
+                "description": f"Based on credit score of {applicant_credit_score}"
+            }
+            actionable_suggestions = []
+            detailed_risk_factors = []
+            alternative_offer = None
         
         # Generate HUMAN-FRIENDLY explanations
         human_summary = generate_human_summary(
@@ -870,7 +878,7 @@ async def check_eligibility(
         
         # Log action
         db.log_action(
-            user_id=user["user_id"],
+            user_id=user.get("sub") or user.get("user_id") or "unknown",
             action="CHECK_ELIGIBILITY",
             resource_type="applicant",
             resource_id=request.applicant_id,
@@ -911,6 +919,9 @@ async def check_eligibility(
                     "payment_to_income_description": f"Monthly payment is {payment_to_income_ratio*100:.1f}% of monthly income"
                 },
                 
+                # Credit Score Classification (Mandatory - Per FYP Requirements)
+                "credit_score": credit_score_info,
+                
                 # Decision
                 "decision": {
                     "eligible": eligible,
@@ -930,18 +941,25 @@ async def check_eligibility(
                 # Risk Analysis (Human-Readable)
                 "risk_analysis": {
                     "concerns": human_risk_factors,
-                    "positive_factors": human_protective_factors
+                    "positive_factors": human_protective_factors,
+                    "detailed_factors": detailed_risk_factors  # From reasoning module
                 },
                 
                 # Recommendations
                 "recommendations": smart_recommendations,
                 
+                # Actionable Suggestions (Multi-factor reasoning)
+                "actionable_suggestions": actionable_suggestions,
+                
+                # Alternative Offer (if rejected)
+                "alternative_offer": alternative_offer,
+                
                 # Feature Importance (for SHAP-like charts)
                 "feature_importance": [
                     {
-                        "feature": f.feature_name.replace('_', ' ').title(),
-                        "importance": f.influence_strength,
-                        "direction": f.influence_direction
+                        "feature": f.get('feature_name', f.get('feature', 'Unknown')).replace('_', ' ').title(),
+                        "importance": f.get('influence_strength', f.get('importance', 0)),
+                        "direction": f.get('influence_direction', 'increases_risk' if not eligible else 'decreases_risk')
                     }
                     for f in (risk_factors[:5] + protective_factors[:5])
                 ],
@@ -968,7 +986,10 @@ async def check_eligibility(
 
 
 def prepare_applicant_features(applicant: Dict, loan_amount: float, loan_term_months: int) -> Dict[str, float]:
-    """Convert applicant data to model features with realistic risk mapping"""
+    """
+    Convert applicant data to ALL model features (73+ features required)
+    Creates comprehensive feature set matching the trained model's expectations
+    """
     from datetime import datetime
     
     # Calculate age
@@ -982,118 +1003,145 @@ def prepare_applicant_features(applicant: Dict, loan_amount: float, loan_term_mo
     # Calculate ratios
     monthly_income = applicant.get('monthly_income', 50000)
     existing_debt = applicant.get('existing_debt_amount', 0)
+    existing_loans = applicant.get('existing_loans_count', 0)
     
     # Credit-to-income ratio (higher = riskier)
     annual_income = monthly_income * 12
-    credit_income_ratio = loan_amount / annual_income if annual_income > 0 else 10
     
-    # Monthly payment ratio (higher = riskier)
+    # Monthly payment
     monthly_payment = loan_amount / loan_term_months
-    annuity_income_ratio = monthly_payment / monthly_income if monthly_income > 0 else 0.5
-    
-    # Debt-to-income ratio consideration
-    total_debt = existing_debt + loan_amount
-    debt_ratio = total_debt / annual_income if annual_income > 0 else 10
     
     # Employment years
     years_employed = applicant.get('years_employed', applicant.get('employment_length', 3))
     if years_employed is None:
         years_employed = 3
     
-    # External sources (use credit score as proxy with more realistic mapping)
+    # Credit score
     credit_score = applicant.get('credit_score', 650)
     
-    # More aggressive mapping: 300-500 = very risky, 500-650 = risky, 650-750 = moderate, 750+ = good
-    if credit_score < 500:
-        ext_source = 0.1 + (credit_score - 300) / 200 * 0.2  # 0.1 to 0.3
-    elif credit_score < 650:
-        ext_source = 0.3 + (credit_score - 500) / 150 * 0.2  # 0.3 to 0.5
-    elif credit_score < 750:
-        ext_source = 0.5 + (credit_score - 650) / 100 * 0.3  # 0.5 to 0.8
-    else:
-        ext_source = 0.8 + (credit_score - 750) / 100 * 0.2  # 0.8 to 1.0
-    
-    # Add some variance between external sources
-    ext_source_1 = min(1.0, ext_source * (0.85 + 0.15 * (credit_score % 10) / 10))
-    ext_source_2 = min(1.0, ext_source * (0.90 + 0.10 * ((credit_score + 3) % 10) / 10))
-    ext_source_3 = min(1.0, ext_source * (0.88 + 0.12 * ((credit_score + 7) % 10) / 10))
-    
-    # CRITICAL: Penalize based on loan-to-income ratio
-    # The higher the ratio, the lower the external scores should be
-    # This directly affects the model's prediction
-    if credit_income_ratio > 100:  # Absurdly high (100x+ annual income)
-        penalty = 0.01  # Almost zero - very high risk
-    elif credit_income_ratio > 50:  # Very high (50-100x annual income)
-        penalty = 0.05
-    elif credit_income_ratio > 20:  # High (20-50x annual income)
-        penalty = 0.1
-    elif credit_income_ratio > 10:  # Elevated (10-20x annual income)
-        penalty = 0.2
-    elif credit_income_ratio > 5:   # Moderate-high (5-10x annual income)
-        penalty = 0.4
-    elif credit_income_ratio > 3:   # Moderate (3-5x annual income)
-        penalty = 0.6
-    elif credit_income_ratio > 2:   # Acceptable (2-3x annual income)
-        penalty = 0.8
-    else:  # Good (<2x annual income)
-        penalty = 1.0
-    
-    ext_source_1 *= penalty
-    ext_source_2 *= penalty
-    ext_source_3 *= penalty
-    
-    # CRITICAL: Penalize based on monthly payment burden
-    if annuity_income_ratio > 5:    # Payment is 5x+ monthly income - impossible
-        payment_penalty = 0.01
-    elif annuity_income_ratio > 2:  # Payment is 2-5x monthly income
-        payment_penalty = 0.05
-    elif annuity_income_ratio > 1:  # Payment exceeds monthly income
-        payment_penalty = 0.1
-    elif annuity_income_ratio > 0.7:  # Payment is 70%+ of income
-        payment_penalty = 0.3
-    elif annuity_income_ratio > 0.5:  # Payment is 50-70% of income
-        payment_penalty = 0.5
-    elif annuity_income_ratio > 0.4:  # Payment is 40-50% of income
-        payment_penalty = 0.7
-    else:  # Payment is <40% of income - manageable
-        payment_penalty = 1.0
-    
-    ext_source_1 *= payment_penalty
-    ext_source_2 *= payment_penalty
-    ext_source_3 *= payment_penalty
-    
-    # Ensure minimum values
-    ext_source_1 = max(0.01, ext_source_1)
-    ext_source_2 = max(0.01, ext_source_2)
-    ext_source_3 = max(0.01, ext_source_3)
-    
+    # Create ALL 73+ features required by the model
     features = {
-        'EXT_SOURCE_1': ext_source_1,
-        'EXT_SOURCE_2': ext_source_2,
-        'EXT_SOURCE_3': ext_source_3,
-        'EXT_SOURCE_MEAN': (ext_source_1 + ext_source_2 + ext_source_3) / 3,
-        'EXT_SOURCE_STD': abs(ext_source_1 - ext_source_3) / 2,
-        'AGE_YEARS': age_years,
-        'DAYS_BIRTH': -age_years * 365.25,
-        'DAYS_EMPLOYED': -years_employed * 365,
-        'CODE_GENDER': 1 if applicant.get('gender', 'M') == 'F' else 0,
-        'NAME_EDUCATION_TYPE': 0,  # Simplified
-        'REGION_RATING_CLIENT': 2,  # Default
-        'REG_CITY_NOT_WORK_CITY': 0,
-        'CREDIT_INCOME_RATIO': credit_income_ratio,
-        'ANNUITY_INCOME_RATIO': annuity_income_ratio,
-        'AMT_CREDIT': loan_amount,
-        'AMT_INCOME_TOTAL': annual_income,
-        'AMT_ANNUITY': monthly_payment,
-        'bureau_DAYS_CREDIT_max': -365,
-        'bureau_DAYS_CREDIT_min': -730,
-        'bureau_DAYS_CREDIT_mean': -500,
-        'bureau_AMT_CREDIT_SUM_DEBT_mean': existing_debt,
-        'inst_AMT_PAYMENT_min': monthly_payment * 0.9,
-        'inst_DAYS_INSTALMENT_min': -30,
-        'prev_DAYS_DECISION_min': -180,
-        'prev_DAYS_DECISION_mean': -365,
-        'DAYS_LAST_PHONE_CHANGE': -180,
+        # Primary identifier
+        'SK_ID_CURR': applicant.get('id', 0),
+        
+        # Contract information
+        'NAME_CONTRACT_TYPE': 0,  # 0=Cash loans, 1=Revolving loans
+        
+        # Property ownership flags
+        'FLAG_OWN_CAR': 1 if applicant.get('assets_value', 0) > 50000 else 0,
+        'FLAG_OWN_REALTY': 1 if applicant.get('assets_value', 0) > 100000 else 0,
+        
+        # Family information
+        'CNT_CHILDREN': 0,  # Default: no children
+        'NAME_TYPE_SUITE': 0,  # Who accompanied client
+        
+        # Income type (map employment status)
+        'NAME_INCOME_TYPE': 0,  # Working, State servant, Commercial associate, Pensioner
+        
+        # Family status (map marital status)
+        'NAME_FAMILY_STATUS': 0 if applicant.get('marital_status', 'Single') == 'Married' else 1,
+        
+        # Housing type
+        'NAME_HOUSING_TYPE': 0,  # House/apartment, With parents, etc.
+        
+        # Registration and identification days
+        'DAYS_REGISTRATION': -365 * 5,  # Days since address registration (negative)
+        'DAYS_ID_PUBLISH': -365 * 3,  # Days since ID was issued (negative)
+        
+        # Car age (based on assets)
+        'OWN_CAR_AGE': 5.0 if applicant.get('assets_value', 0) > 50000 else 0,
+        
+        # Contact information flags
+        'FLAG_EMP_PHONE': 1,  # Has work phone
+        'FLAG_WORK_PHONE': 1,
+        'FLAG_PHONE': 1 if applicant.get('phone') else 0,
+        'FLAG_EMAIL': 1 if applicant.get('email') else 0,
+        
+        # Occupation (map from occupation field)
+        'OCCUPATION_TYPE': 0,  # Laborers, Core staff, Sales staff, etc.
+        
+        # Family members count
+        'CNT_FAM_MEMBERS': 2.0,  # Default 2
+        
+        # Application process timing
+        'WEEKDAY_APPR_PROCESS_START': 1,  # Monday=0, Sunday=6
+        'HOUR_APPR_PROCESS_START': 12,  # Hour of day (0-23)
+        
+        # Regional matching flags
+        'REG_REGION_NOT_LIVE_REGION': 0,
+        'REG_REGION_NOT_WORK_REGION': 0,
+        'LIVE_REGION_NOT_WORK_REGION': 0,
+        'REG_CITY_NOT_LIVE_CITY': 0,
+        'LIVE_CITY_NOT_WORK_CITY': 0,
+        
+        # Organization type
+        'ORGANIZATION_TYPE': 0,  # Business Entity Type 3, School, etc.
+        
+        # Building information (apartment building features)
+        'ELEVATORS_AVG': 1.0,
+        'FLOORSMAX_AVG': 10.0,
+        'FONDKAPREMONT_MODE': 0,  # Foundation repair mode
+        'HOUSETYPE_MODE': 0,  # block of flats, terraced house
+        'WALLSMATERIAL_MODE': 0,  # Panel, Block, etc.
+        
+        # Social circle (credit bureau checks)
+        'OBS_30_CNT_SOCIAL_CIRCLE': 2.0,  # Observations in social circle
+        'DEF_30_CNT_SOCIAL_CIRCLE': 0,  # Defaults in social circle (30 days)
+        'DEF_60_CNT_SOCIAL_CIRCLE': 0,  # Defaults in social circle (60 days)
+        
+        # Document submission flags
+        'FLAG_DOCUMENT_3': 1,
+        'FLAG_DOCUMENT_5': 0,
+        'FLAG_DOCUMENT_6': 1,
+        'FLAG_DOCUMENT_8': 0,
+        
+        # Credit bureau inquiries
+        'AMT_REQ_CREDIT_BUREAU_DAY': 0,  # Inquiries in last day
+        'AMT_REQ_CREDIT_BUREAU_WEEK': 0,  # Inquiries in last week
+        'AMT_REQ_CREDIT_BUREAU_MON': 1,  # Inquiries in last month
+        'AMT_REQ_CREDIT_BUREAU_QRT': 2,  # Inquiries in last quarter
+        'AMT_REQ_CREDIT_BUREAU_YEAR': existing_loans,  # Inquiries in last year
+        
+        # Bureau features (credit history from credit bureau)
+        'bureau_CREDIT_DAY_OVERDUE_max': 0,  # Max days overdue
+        'bureau_CREDIT_DAY_OVERDUE_mean': 0,  # Mean days overdue
+        'bureau_AMT_CREDIT_MAX_OVERDUE_max': 0,  # Max overdue amount
+        'bureau_AMT_CREDIT_SUM_sum': existing_debt,  # Total credit sum
+        'bureau_AMT_CREDIT_SUM_mean': existing_debt / max(existing_loans, 1),
+        'bureau_AMT_CREDIT_SUM_DEBT_sum': existing_debt,  # Total current debt
+        'bureau_AMT_CREDIT_SUM_LIMIT_sum': annual_income * 3,  # Credit card limits
+        'bureau_CNT_CREDIT_PROLONG_sum': 0,  # Times credit was prolonged
+        'bureau_bb_months_count': 12 * existing_loans,  # Months balance reported
+        'bureau_bb_status_good': 1 if credit_score > 650 else 0,  # Good credit status
+        
+        # Previous application features
+        'prev_AMT_ANNUITY_min': monthly_payment * 0.5,
+        'prev_AMT_ANNUITY_max': monthly_payment * 1.5,
+        'prev_AMT_ANNUITY_mean': monthly_payment,
+        'prev_AMT_APPLICATION_min': loan_amount * 0.5,
+        'prev_AMT_APPLICATION_max': loan_amount * 1.5,
+        'prev_AMT_APPLICATION_mean': loan_amount,
+        'prev_DAYS_DECISION_max': -30,  # Days since last decision
+        'prev_NAME_CONTRACT_STATUS_<lambda>': 1,  # Previous contract approved
+        'prev_NAME_TYPE_SUITE_count': 1,
+        
+        # Installment payments features
+        'inst_NUM_INSTALMENT_NUMBER_count': loan_term_months,
+        'inst_NUM_INSTALMENT_NUMBER_max': loan_term_months,
+        'inst_NUM_INSTALMENT_VERSION_nunique': 1,
+        'inst_DAYS_INSTALMENT_max': -30,
+        'inst_DAYS_ENTRY_PAYMENT_mean': -30,
+        'inst_AMT_INSTALMENT_min': monthly_payment * 0.9,
+        'inst_AMT_INSTALMENT_max': monthly_payment * 1.1,
+        'inst_AMT_INSTALMENT_mean': monthly_payment,
+        
+        # Credit card balance features
+        'cc_drawings_current_mean': monthly_income * 0.1,  # Credit card drawings
+        'cc_instalment_mature_mean': monthly_payment * 0.5,
+        
+        # Calculated features
+        'CREDIT_TERM': loan_term_months,  # Loan term in months
+        'DAYS_EMPLOYED_PERC': (years_employed * 365) / (age_years * 365) if age_years > 0 else 0.1,
     }
     
     return features

@@ -91,10 +91,10 @@ export default function TransactionList({ transactions }: TransactionListProps) 
         return (
             <Box sx={{ textAlign: 'center', py: 4 }}>
                 <Typography variant="h6" color="text.secondary" gutterBottom>
-                    No Transactions Available
+                    No Previous Transactions
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                    Transaction history will appear here once available.
+                    This applicant has no transaction history. Transactions will appear here once loan activity begins.
                 </Typography>
             </Box>
         );

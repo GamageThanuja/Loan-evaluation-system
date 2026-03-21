@@ -1,0 +1,123 @@
+# =============================================================================
+# UNIFIED APPLICATION CONFIGURATION
+# Loan Evaluation System - Sri Lankan Banks
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# TRAINING CONFIGURATION
+# -----------------------------------------------------------------------------
+training:
+  epochs: 20                    # MAX 20 epochs (HARD LIMIT)
+  early_stopping: 10            # Stop if no improvement for 10 epochs
+  batch_size: 1024
+  learning_rate: 0.02
+  seed: 42
+  sample_rate: 0.2              # Use 20% of data for faster training
+
+# -----------------------------------------------------------------------------
+# MODEL CONFIGURATION  
+# -----------------------------------------------------------------------------
+model:
+  name: "TabNet"
+  file: "tabnet.pkl"            # ONLY ONE model file
+  threshold: 0.309              # Classification threshold (optimized for F1)
+  
+  # TabNet Architecture
+  architecture:
+    n_d: 8
+    n_a: 8
+    n_steps: 3
+    gamma: 1.3
+    lambda_sparse: 0.001
+
+# -----------------------------------------------------------------------------
+# PATHS (relative to project root)
+# -----------------------------------------------------------------------------
+paths:
+  model: "ml-model/models/tabnet.pkl"
+  data_raw: "ml-model/data/raw"
+  data_processed: "ml-model/data/processed"
+  logs: "logs"
+
+# -----------------------------------------------------------------------------
+# FEATURES
+# -----------------------------------------------------------------------------
+features:
+  numerical:
+    - AMT_INCOME_TOTAL
+    - AMT_CREDIT
+    - AMT_ANNUITY
+    - AMT_GOODS_PRICE
+    - DAYS_BIRTH
+    - DAYS_EMPLOYED
+    - EXT_SOURCE_1
+    - EXT_SOURCE_2
+    - EXT_SOURCE_3
+    
+  categorical:
+    - NAME_CONTRACT_TYPE
+    - CODE_GENDER
+    - FLAG_OWN_CAR
+    - FLAG_OWN_REALTY
+    - NAME_INCOME_TYPE
+    - NAME_EDUCATION_TYPE
+    - NAME_FAMILY_STATUS
+    - NAME_HOUSING_TYPE
+    - OCCUPATION_TYPE
+
+# -----------------------------------------------------------------------------
+# BUSINESS RULES (Sri Lankan Context)
+# -----------------------------------------------------------------------------
+business:
+  max_loan_amount: 1000000      # LKR 1,000,000
+  min_loan_amount: 50000        # LKR 50,000
+  max_dti_ratio: 0.4            # 40% debt-to-income
+  max_loan_to_income: 5.0       # 5x annual income
+  interest_rate: 0.12           # 12% annual
+  currency: "LKR"
+  
+  risk_levels:
+    very_low: 0.2               # < 20% = Very Low Risk
+    low: 0.35                   # 20-35% = Low Risk
+    medium: 0.5                 # 35-50% = Medium Risk
+    high: 0.7                   # 50-70% = High Risk
+    very_high: 1.0              # > 70% = Very High Risk
+
+# -----------------------------------------------------------------------------
+# CREDIT SCORE CLASSIFICATION (Mandatory)
+# -----------------------------------------------------------------------------
+credit_score:
+  poor:
+    max: 579
+    description: "Poor - Significant credit issues"
+  fair:
+    min: 580
+    max: 669
+    description: "Fair - Some credit problems"
+  good:
+    min: 670
+    max: 739
+    description: "Good - Responsible credit management"
+  very_good:
+    min: 740
+    max: 799
+    description: "Very Good - Excellent credit history"
+  exceptional:
+    min: 800
+    description: "Exceptional - Outstanding credit management"
+
+# -----------------------------------------------------------------------------
+# API CONFIGURATION
+# -----------------------------------------------------------------------------
+api:
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+  
+# -----------------------------------------------------------------------------
+# LOGGING
+# -----------------------------------------------------------------------------
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(levelname)s - %(message)s"
+  file: "logs/app.log"
