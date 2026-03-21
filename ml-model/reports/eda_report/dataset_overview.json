@@ -1,0 +1,56 @@
+{
+  "shape": [
+    4269,
+    13
+  ],
+  "columns": [
+    "loan_id",
+    "no_of_dependents",
+    "education",
+    "self_employed",
+    "income_annum",
+    "loan_amount",
+    "loan_term",
+    "cibil_score",
+    "residential_assets_value",
+    "commercial_assets_value",
+    "luxury_assets_value",
+    "bank_asset_value",
+    "loan_status"
+  ],
+  "dtypes": {
+    "loan_id": "int64",
+    "no_of_dependents": "int64",
+    "education": "str",
+    "self_employed": "str",
+    "income_annum": "int64",
+    "loan_amount": "int64",
+    "loan_term": "int64",
+    "cibil_score": "int64",
+    "residential_assets_value": "int64",
+    "commercial_assets_value": "int64",
+    "luxury_assets_value": "int64",
+    "bank_asset_value": "int64",
+    "loan_status": "str"
+  },
+  "missing_values": {
+    "loan_id": 0,
+    "no_of_dependents": 0,
+    "education": 0,
+    "self_employed": 0,
+    "income_annum": 0,
+    "loan_amount": 0,
+    "loan_term": 0,
+    "cibil_score": 0,
+    "residential_assets_value": 0,
+    "commercial_assets_value": 0,
+    "luxury_assets_value": 0,
+    "bank_asset_value": 0,
+    "loan_status": 0
+  },
+  "duplicates": 0,
+  "target_distribution": {
+    "Approved": 2656,
+    "Rejected": 1613
+  }
+}

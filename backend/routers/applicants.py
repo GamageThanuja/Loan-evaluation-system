@@ -51,6 +51,7 @@ class ApplicantBase(BaseModel):
     annual_income: Optional[float] = Field(None, ge=0, description="Annual income")
     account_number: Optional[str] = Field(None, description="Bank account number")
     dependents: Optional[int] = Field(0, ge=0, description="Number of dependents")
+    education_level: str = Field(..., description="Education level")
     
     # Loan details - optional when creating applicant without loan request
     loan_amount: float = Field(0, ge=0, description="Requested loan amount")
@@ -58,6 +59,7 @@ class ApplicantBase(BaseModel):
     loan_term_months: int = Field(12, ge=1, le=360, description="Loan term in months")
     
     # Financial details
+    assets_value: float = Field(0, ge=0, description="Total assets value")
     credit_score: Optional[int] = Field(None, ge=300, le=850, description="Credit score")
     existing_loans: Optional[int] = Field(0, ge=0, description="Number of existing loans")
     monthly_expenses: Optional[float] = Field(None, ge=0, description="Monthly expenses")
@@ -96,9 +98,11 @@ class ApplicantUpdate(BaseModel):
     annual_income: Optional[float] = Field(None, ge=0)
     account_number: Optional[str] = None
     dependents: Optional[int] = Field(None, ge=0)
+    education_level: Optional[str] = None
     loan_amount: Optional[float] = Field(None, ge=0)
     loan_purpose: Optional[str] = None
     loan_term_months: Optional[int] = Field(None, ge=1, le=360)
+    assets_value: Optional[float] = Field(None, ge=0)
     credit_score: Optional[int] = Field(None, ge=300, le=850)
     existing_loans: Optional[int] = Field(None, ge=0)
     monthly_expenses: Optional[float] = Field(None, ge=0)
@@ -163,9 +167,11 @@ class ApplicantResponse(BaseModel):
     annual_income: Optional[float] = None
     account_number: Optional[str] = None
     dependents: Optional[int] = None
+    education_level: Optional[str] = None
     loan_amount: float
     loan_purpose: str
     loan_term_months: int
+    assets_value: Optional[float] = None
     credit_score: Optional[int] = None
     existing_loans: Optional[int] = None
     monthly_expenses: Optional[float] = None
@@ -385,6 +391,7 @@ async def get_applicant(
             "marital_status": applicant.get("marital_status"),
             "dependents": applicant.get("dependents"),  # May not exist in DB, will be None
             "nic": applicant.get("nic"),
+            "education_level": applicant.get("education_level"),
             
             # Employment - map from database columns
             "employment_type": applicant.get("employment_status"),
@@ -394,6 +401,7 @@ async def get_applicant(
             "monthly_income": applicant.get("monthly_income"),
             
             # Financial
+            "assets_value": applicant.get("assets_value"),
             "credit_score": applicant.get("credit_score"),
             "existing_loans": applicant.get("existing_loans_count"),
             
@@ -465,6 +473,7 @@ async def create_applicant(
             "gender": raw_data.get("gender"),
             "marital_status": raw_data.get("marital_status"),
             "nic": raw_data.get("nic"),
+            "education_level": raw_data.get("education_level"),
             
             # Employment - map to database columns
             "employment_status": raw_data.get("employment_type"),
@@ -474,6 +483,7 @@ async def create_applicant(
             "monthly_income": raw_data.get("monthly_income", 0),
             
             # Financial
+            "assets_value": raw_data.get("assets_value", 0),
             "credit_score": raw_data.get("credit_score"),
             "existing_loans_count": raw_data.get("existing_loans", 0),
             

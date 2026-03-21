@@ -1,0 +1,49 @@
+{
+  "original_shape": [
+    4269,
+    23
+  ],
+  "train_shape": [
+    3718,
+    22
+  ],
+  "val_shape": [
+    640,
+    22
+  ],
+  "test_shape": [
+    641,
+    22
+  ],
+  "train_class_distribution": {
+    "approved": 1859,
+    "rejected": 1859
+  },
+  "features": [
+    "no_of_dependents",
+    "education",
+    "self_employed",
+    "income_annum",
+    "loan_amount",
+    "loan_term",
+    "cibil_score",
+    "residential_assets_value",
+    "commercial_assets_value",
+    "luxury_assets_value",
+    "bank_asset_value",
+    "loan_to_income_ratio",
+    "total_assets",
+    "assets_to_loan_ratio",
+    "assets_to_income_ratio",
+    "debt_to_asset_ratio",
+    "monthly_payment",
+    "payment_to_income_ratio",
+    "cibil_excellent",
+    "cibil_good",
+    "cibil_fair",
+    "cibil_poor"
+  ],
+  "num_features": 22,
+  "scaler": "StandardScaler",
+  "imbalance_method": "SMOTE"
+}

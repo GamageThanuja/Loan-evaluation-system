@@ -450,6 +450,16 @@ export default function ApplicantDetailPage() {
               <Typography variant="body2">{applicant.maritalStatus ?? 'N/A'}</Typography>
           </Grid>
           <Grid item xs={6}>
+              <Typography variant="caption" color="text.secondary">Education Level</Typography>
+              <Typography variant="body2">{applicant.educationLevel ?? 'N/A'}</Typography>
+          </Grid>
+          <Grid item xs={6}>
+              <Typography variant="caption" color="text.secondary">Total Assets</Typography>
+              <Typography variant="body2" fontWeight={600}>
+                {formatCurrency(applicant.assetsValue ?? 0)}
+              </Typography>
+          </Grid>
+          <Grid item xs={6}>
               <Typography variant="caption" color="text.secondary">Dependents</Typography>
               <Typography variant="body2">{applicant.dependents ?? 'N/A'}</Typography>
           </Grid>

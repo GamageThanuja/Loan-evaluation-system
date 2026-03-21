@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# LoanWise Application Stop Script
+# LoanWise Application Stop Script (v4.0.0)
 # Stops both backend and frontend servers
 # =============================================================================
 

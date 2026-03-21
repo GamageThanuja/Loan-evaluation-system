@@ -316,6 +316,8 @@ export interface ApplicantFormData {
   annualIncome: number;
   employmentType: 'Employed' | 'Self-Employed' | 'Unemployed' | 'Student' | 'Retired';
   employmentLength: number;
+  educationLevel: 'High School' | 'Bachelor' | 'Master' | 'PhD' | 'Other';
+  assetsValue: number;
   creditScore: number;
   
   // Loan

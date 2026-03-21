@@ -139,6 +139,8 @@ const newApplicantSchema = z.object({
   jobTitle: z.string().optional(),
   employmentLength: z.number().min(0).max(50),
   monthlyIncome: z.number().min(0, 'Monthly income must be positive'),
+  educationLevel: z.enum(['High School', 'Bachelor', 'Master', 'PhD', 'Other']),
+  assetsValue: z.number().min(0, 'Assets value must be positive'),
 
   // Loan Details
   loanAmount: z.number().min(10000, 'Loan amount must be at least LKR 10,000'),
@@ -176,6 +178,8 @@ export default function NewApplicantPage() {
     jobTitle: '',
     employmentLength: 0,
     monthlyIncome: 0,
+    educationLevel: 'Bachelor',
+    assetsValue: 0,
     loanAmount: 0,
     loanPurpose: '',
     loanTermMonths: 12,
@@ -242,7 +246,7 @@ export default function NewApplicantPage() {
     const stepFields: Record<number, (keyof NewApplicantFormData)[]> = {
       0: ['firstName', 'lastName', 'nic', 'dateOfBirth', 'gender', 'maritalStatus', 'dependents'],
       1: ['email', 'phone', 'address', 'city', 'district', 'postalCode'],
-      2: ['employmentType', 'employmentLength', 'monthlyIncome'],
+      2: ['employmentType', 'employmentLength', 'monthlyIncome', 'educationLevel', 'assetsValue'],
       3: ['loanAmount', 'loanPurpose', 'loanTermMonths'],
     };
 
@@ -341,6 +345,8 @@ export default function NewApplicantPage() {
         job_title: formData.jobTitle?.trim() || null,
         employment_length: formData.employmentLength,
         monthly_income: formData.monthlyIncome,
+        education_level: formData.educationLevel,
+        assets_value: formData.assetsValue,
         loan_amount: formData.loanAmount,
         loan_purpose: formData.loanPurpose,
         loan_term_months: formData.loanTermMonths,
@@ -692,6 +698,38 @@ export default function NewApplicantPage() {
                 onChange={handleChange('monthlyIncome')}
                 error={Boolean(errors.monthlyIncome)}
                 helperText={errors.monthlyIncome}
+                InputProps={{ startAdornment: <Typography sx={{ mr: 1 }}>LKR</Typography> }}
+                placeholder="0"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                required
+                select
+                label="Education Level"
+                value={formData.educationLevel}
+                onChange={handleChange('educationLevel')}
+                error={Boolean(errors.educationLevel)}
+                helperText={errors.educationLevel}
+              >
+                <MenuItem value="High School">High School</MenuItem>
+                <MenuItem value="Bachelor">Bachelor</MenuItem>
+                <MenuItem value="Master">Master</MenuItem>
+                <MenuItem value="PhD">PhD</MenuItem>
+                <MenuItem value="Other">Other</MenuItem>
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                required
+                label="Total Assets Value"
+                type="number"
+                value={getNumberFieldValue('assetsValue')}
+                onChange={handleChange('assetsValue')}
+                error={Boolean(errors.assetsValue)}
+                helperText={errors.assetsValue}
                 InputProps={{ startAdornment: <Typography sx={{ mr: 1 }}>LKR</Typography> }}
                 placeholder="0"
               />

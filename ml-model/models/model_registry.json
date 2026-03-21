@@ -1,90 +1,150 @@
 {
-  "models": {
-    "hybrid_model": {
-      "version": "3.0.0",
-      "path": "hybrid_model.joblib",
-      "architecture": "Bayesian Neural Network + Gradient Boosting Ensemble",
-      "created_at": "2026-02-03",
-      "metrics": {
-        "accuracy": 0.9941,
-        "precision": 0.9944,
-        "recall": 0.9962,
-        "f1_score": 0.9953,
-        "roc_auc": 0.9998
-      },
-      "components": {
-        "bayesian_neural_network": {
-          "framework": "PyTorch",
-          "hidden_layers": [128, 64, 32],
-          "dropout_rate": 0.3,
-          "mc_samples": 50,
-          "purpose": "Uncertainty quantification via MC-Dropout"
-        },
-        "gradient_boosting": {
-          "library": "sklearn",
-          "n_estimators": 100,
-          "max_depth": 5,
-          "calibrated": true,
-          "purpose": "Robust probability estimation"
-        },
-        "ensemble_weights": {
-          "bnn": 0.6,
-          "gb": 0.4
-        },
-        "loss_function": {
-          "type": "Focal Loss",
-          "alpha": 0.75,
-          "gamma": 2.0
-        }
-      },
-      "preprocessing": {
-        "scaler": "StandardScaler",
-        "pca_components": 12,
-        "pca_variance_explained": 0.9632,
-        "class_balancing": "SMOTE-Tomek"
-      },
-      "training": {
-        "dataset": "loan_approval_dataset.csv",
-        "samples": 4269,
-        "features_raw": 22,
-        "features_pca": 12,
-        "approval_rate": "62.2%",
-        "class_imbalance_handling": "SMOTE-Tomek"
-      },
-      "thresholds": {
-        "optimal": 0.5,
-        "optimization_metric": "F1"
-      },
-      "is_production": true
+  "best_model": {
+    "name": "ANN + BN Tuned",
+    "architecture": "ANN",
+    "phase": "tuned",
+    "path": "best_model.pth",
+    "bayesian_network_path": "bayesian_network.pkl",
+    "metrics": {
+      "accuracy": 0.9953198127925117,
+      "precision": 0.995,
+      "recall": 0.9974937343358395,
+      "f1": 0.9962453066332916,
+      "roc_auc": 0.9999585741212536,
+      "mse": 0.002992703579366207,
+      "rmse": 0.05470560829902367,
+      "aic": 84236.66003995629,
+      "bic": 87707.94521185731
     },
-    "bayesian_nn": {
-      "version": "3.0.0",
-      "path": "bayesian_nn.joblib",
-      "architecture": "MC-Dropout Bayesian Neural Network",
-      "created_at": "2026-02-03",
-      "metrics": {
-        "accuracy": 0.9953,
-        "precision": 0.9925,
-        "recall": 1.0,
-        "f1_score": 0.9962,
-        "roc_auc": 0.9999
-      },
-      "is_production": false
+    "cross_validation": {
+      "accuracy_mean": 0.9972474430950401,
+      "accuracy_std": 0.0030982827240622944,
+      "precision_mean": 0.9977836862037165,
+      "precision_std": 0.0027156214435463018,
+      "recall_mean": 0.9969006926593804,
+      "recall_std": 0.0033546087141226324,
+      "f1_mean": 0.9973416999642642,
+      "f1_std": 0.0029917653460735712,
+      "roc_auc_mean": 0.9999399481271782,
+      "roc_auc_std": 6.813161984324786e-05
     },
-    "bayesian_network": {
-      "version": "3.0.0",
-      "path": "bayesian_network.joblib",
-      "architecture": "Calibrated Gradient Boosting",
-      "created_at": "2026-02-03",
-      "metrics": {
-        "accuracy": 0.9941,
-        "precision": 0.9944,
-        "recall": 0.9962,
-        "f1_score": 0.9953,
-        "roc_auc": 0.9942
-      },
-      "is_production": false
+    "selection_weights": {
+      "f1": 0.4,
+      "roc_auc": 0.3,
+      "accuracy": 0.2,
+      "rmse_inv": 0.1
+    },
+    "feature_names": [
+      "no_of_dependents",
+      "education",
+      "self_employed",
+      "income_annum",
+      "loan_amount",
+      "loan_term",
+      "cibil_score",
+      "residential_assets_value",
+      "commercial_assets_value",
+      "luxury_assets_value",
+      "bank_asset_value",
+      "loan_to_income_ratio",
+      "total_assets",
+      "assets_to_loan_ratio",
+      "assets_to_income_ratio",
+      "debt_to_asset_ratio",
+      "monthly_payment",
+      "payment_to_income_ratio",
+      "cibil_excellent",
+      "cibil_good",
+      "cibil_fair",
+      "cibil_poor",
+      "bn_risk_embedding"
+    ],
+    "input_dim": 23,
+    "hyperparameters": {
+      "hidden_dims": [
+        128,
+        64,
+        32
+      ],
+      "dropout": 0.4,
+      "learning_rate": 0.0005,
+      "batch_size": 32,
+      "epochs": 150,
+      "optimizer": "adam",
+      "patience": 20
+    },
+    "created_at": "2026-03-21T21:35:55.868266"
+  },
+  "all_models": {
+    "ANN + BN Baseline": {
+      "accuracy": 0.9937597503900156,
+      "precision": 0.9949874686716792,
+      "recall": 0.9949874686716792,
+      "f1": 0.9949874686716792,
+      "roc_auc": 0.9998550094243874,
+      "mse": 0.00447892677038908,
+      "rmse": 0.06692478442542105,
+      "aic": 84236.66003995629,
+      "bic": 87707.94521185731
+    },
+    "LSTM + BN Baseline": {
+      "accuracy": 0.9890795631825273,
+      "precision": 0.99,
+      "recall": 0.9924812030075187,
+      "f1": 0.9912390488110138,
+      "roc_auc": 0.9993475424097433,
+      "mse": 0.0072520081885159016,
+      "rmse": 0.08515872350215156,
+      "aic": 84236.66003995629,
+      "bic": 87707.94521185731
+    },
+    "RNN + BN Baseline": {
+      "accuracy": 0.9921996879875195,
+      "precision": 0.9925,
+      "recall": 0.9949874686716792,
+      "f1": 0.9937421777221527,
+      "roc_auc": 0.9998860788334473,
+      "mse": 0.004922761581838131,
+      "rmse": 0.0701623943565079,
+      "aic": 84236.66003995629,
+      "bic": 87707.94521185731
+    },
+    "ANN + BN Tuned": {
+      "accuracy": 0.9953198127925117,
+      "precision": 0.995,
+      "recall": 0.9974937343358395,
+      "f1": 0.9962453066332916,
+      "roc_auc": 0.9999585741212536,
+      "mse": 0.002992703579366207,
+      "rmse": 0.05470560829902367,
+      "aic": 84236.66003995629,
+      "bic": 87707.94521185731
+    },
+    "LSTM + BN Tuned": {
+      "accuracy": 0.9937597503900156,
+      "precision": 0.9925187032418953,
+      "recall": 0.9974937343358395,
+      "f1": 0.995,
+      "roc_auc": 0.9998342964850142,
+      "mse": 0.004643967840820551,
+      "rmse": 0.06814666419437235,
+      "aic": 84236.66003995629,
+      "bic": 87707.94521185731
+    },
+    "RNN + BN Tuned": {
+      "accuracy": 0.9937597503900156,
+      "precision": 0.9925187032418953,
+      "recall": 0.9974937343358395,
+      "f1": 0.995,
+      "roc_auc": 0.999865365894074,
+      "mse": 0.005329612176865339,
+      "rmse": 0.0730041928718162,
+      "aic": 84236.66003995629,
+      "bic": 87707.94521185731
     }
   },
-  "current_production": "hybrid_model"
+  "bayesian_network": {
+    "aic": 84236.66003995629,
+    "bic": 87707.94521185731
+  }
 }

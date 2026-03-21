@@ -404,26 +404,26 @@ class LoanReasoningEngine:
         major_risks = [r for r in self.risk_factors if r.severity == "major"]
         
         # Decision logic: model probability + rule-based factors
-        threshold = 0.309  # From config
+        threshold = 0.80  # High threshold for high-risk system accuracy
         
         # Stricter for critical risks
         if critical_risks:
             eligible = False
-        elif major_risks and model_probability > 0.4:
+        elif major_risks and model_probability < 0.6:  # If major risks exist, need higher prob
             eligible = False
-        elif model_probability > threshold:
+        elif model_probability < threshold:
             eligible = False
         else:
             eligible = True
         
-        # Calculate risk level
-        if model_probability < 0.2:
+        # Calculate risk level (Higher Prob = Lower Risk / Better Candidate)
+        if model_probability >= 0.8:
             risk_level = "Very Low Risk"
-        elif model_probability < 0.35:
+        elif model_probability >= 0.65:
             risk_level = "Low Risk"
-        elif model_probability < 0.5:
+        elif model_probability >= 0.5:
             risk_level = "Medium Risk"
-        elif model_probability < 0.7:
+        elif model_probability >= 0.35:
             risk_level = "High Risk"
         else:
             risk_level = "Very High Risk"
@@ -487,7 +487,9 @@ class LoanReasoningEngine:
             if major_risks and len(reasons) < 2:
                 reasons.append(major_risks[0].impact_description)
             if not reasons:
-                reasons.append(f"Our assessment shows a {probability*100:.0f}% chance of payment difficulties.")
+                # If probability is success probability, risk is (1 - prob)
+                risk_prob = (1 - probability) * 100
+                reasons.append(f"Our assessment shows a {risk_prob:.0f}% chance of payment difficulties.")
             
             return (
                 f"❌ Sorry, We Can't Approve This Loan Right Now. "
