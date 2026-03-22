@@ -31,10 +31,6 @@ class Config:
     REPORTS_DIR = OVERALL_PROJECT_ROOT / 'ml-model' / 'reports'
     RESULTS_DIR = OVERALL_PROJECT_ROOT / 'ml-model' / 'results'
     
-    # Config path
-    CONFIG_DIR = OVERALL_PROJECT_ROOT / 'config'
-    APP_CONFIG = CONFIG_DIR / 'app_config.yaml'
-    
     # Model files
     BEST_MODEL = MODELS_DIR / 'best_model.pth'
     BAYESIAN_MODEL = MODELS_DIR / 'bayesian_network.pkl'

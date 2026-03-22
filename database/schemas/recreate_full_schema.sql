@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- 4. Create Applicants Table (Updated with v4.0 columns)
 CREATE TABLE applicants (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  application_number SERIAL,
   
   -- Personal Information
   name VARCHAR(255) NOT NULL,
