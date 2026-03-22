@@ -1,159 +1,122 @@
-# LoanWise - Intelligent Loan Evaluation System
+# 🏦 LoanWise - Loan Evaluation System
 
-A machine learning-powered loan evaluation system with explainable AI using a Hybrid Bayesian Model architecture.
+LoanWise is a comprehensive, AI-powered system designed for evaluating loan applications, predicting default risks, and managing the overall loan lifecycle. The platform leverages a modern web stack for its user interface and an advanced **Hybrid Bayesian deep Learning Architecture** for highly interpretable and uncertainty-aware risk prediction.
 
-## 🎯 Model Architecture
+## 🌟 Key Features
 
-### Hybrid Bayesian Model (v2.0.0)
+*   **Intelligent Risk Assessment:** Uses a Hybrid Model approach combining a Bayesian Network (BN) with various deep learning architectures (ANN, LSTM, RNN) to calculate the probability of default.
+*   **Uncertainty Quantification:** Quantifies both Epistemic (model) and Aleatoric (data) uncertainty to assign confidence scores and risk recommendations.
+*   **Explainable AI (XAI):** Interrogates model decisions using LIME to ensure transparency and fairness in predictions.
+*   **Modern Interactive Dashboard:** Built with Next.js and Material UI to track applications, view statuses, and visualize evaluation metrics.
+*   **Secure & Robust:** Employs JWT-based authentication, role-based access control, and PostgreSQL database management (via Supabase).
 
-Our production model combines two powerful components:
+## 🏗️ Architecture & Tech Stack
 
-#### 1. Bayesian Network (PGMPY)
-- **Purpose**: Causal structure learning and probabilistic embeddings
-- **Algorithm**: Hill Climb with BIC scoring
-- **Structure**: Learned 17-21 causal edges from data
-- **Output**: Risk embeddings for BNN input
+This project is a monorepo split into four core domains:
 
-#### 2. Bayesian Neural Network (PyTorch)
-- **Architecture**: [256, 128, 64] hidden layers
-- **Uncertainty**: MC-Dropout (0.2 rate, 50 forward passes)
-- **Loss Function**: ELBO = BCE + KL Divergence
-- **Class Weights**: {0: 0.544, 1: 6.194} for imbalance handling
+### 1. Frontend (`/frontend`)
+*   **Framework:** [Next.js](https://nextjs.org/) 14 (React 18)
+*   **Language:** TypeScript
+*   **Styling:** Tailwind CSS + Material UI (MUI)
+*   **State Management & Fetching:** Zustand, React Query, Axios
 
-### Performance Metrics
-| Metric | Value |
-|--------|-------|
-| Accuracy | 85.39% |
-| Precision | 24.95% |
-| Recall | 40.31% |
-| F1 Score | 30.83% |
-| ROC-AUC | 76.01% |
+### 2. Backend API (`/backend`)
+*   **Framework:** [FastAPI](https://fastapi.tiangolo.com/)
+*   **Language:** Python 3
+*   **Security:** JWT, Passlib, Bcrypt setup for user authentication.
+*   **Role:** Acts as the principal gateway integrating the ML inference engine with the PostgreSQL database and providing a RESTful API to the frontend.
 
-### Key Features
-- ✅ **Uncertainty Quantification**: Epistemic & aleatoric uncertainty
-- ✅ **Explainable Predictions**: Causal factor analysis
-- ✅ **Class Imbalance Handling**: Weighted loss function
-- ✅ **Production Ready**: FastAPI backend integration
+### 3. Machine Learning Model (`/ml-model`)
+*   **Core Libraries:** PyTorch, Scikit-learn, Pandas, NumPy, pgmpy, LIME.
+*   **Model Type:** Hybrid Deep Learning & Bayesian Architecture.
+    *   *Bayesian Network (BN)*: Learns causal structures and generates probabilistic embeddings.
+    *   *Deep Learning Models (ANN / LSTM / RNN)*: Extracts deep features from both raw data and BN embeddings to evaluate risk.
+*   **Explainability:** Incorporates XAI (LIME) for local interpretable model-agnostic explanations.
 
-## 🏗️ Project Structure
+### 4. Database (`/database`)
+*   **Provider:** [Supabase](https://supabase.com/) (PostgreSQL)
+*   **Migrations:** Structured SQL migrations (users, schemas, RLS policies, status management).
 
-```
-Loan-evaluation-system/
-├── backend/                    # FastAPI backend
-│   ├── api.py                 # Main API entry point
-│   ├── routers/               # API routes
-│   │   ├── predictions.py     # ML prediction endpoints
-│   │   ├── applicants.py      # Applicant CRUD
-│   │   └── auth.py            # Authentication
-│   └── src/
-│       └── inference/
-│           └── predictor.py   # Model inference module
-├── frontend/                   # Next.js frontend
-│   ├── app/                   # App router pages
-│   ├── components/            # React components
-│   └── services/              # API services
-├── ml-model/                   # ML model training
-│   ├── training/
-│   │   ├── bayesian_network.py    # BN implementation
-│   │   ├── bayesian_nn.py         # BNN implementation
-│   │   ├── hybrid_model.py        # Combined model
-│   │   └── train_pipeline.py      # Training script
-│   └── models/
-│       └── hybrid/
-│           └── hybrid_bayesian_model.joblib
-├── database/                   # Supabase schemas
-└── scripts/                    # Helper scripts
+## 📂 Project Structure
+
+```text
+├── backend/            # FastAPI source code, routers, middleware, and inference endpoints
+├── database/           # SQL schemas and Supabase migration scripts
+├── frontend/           # Next.js web application
+├── ml-model/           # Machine learning training pipelines, models, data, and Jupyter notebooks
+├── logs/               # Application-level logs
+├── start.sh            # Global startup script bridging frontend and backend
+└── stop.sh             # Global teardown script
 ```
 
-## 🚀 Quick Start
+## 🚀 Getting Started
 
 ### Prerequisites
-- Python 3.10+
-- Node.js 18+
-- npm or yarn
+*   **Node.js** (v18 or higher recommended) & npm/pnpm
+*   **Python** 3.9+
+*   **LSOF & Bash** (for running the management scripts)
+*   Supabase Account/Instance (set up your environment variables based on the database schema)
 
-### 1. Start Backend
+### 🛠️ One-Click Setup & Run
 
+We provide a convenient bash script that automatically manages virtual environments, installs Python/Node dependencies, and maps them correctly.
+
+To run both the backend API and frontend simultaneously:
+
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+**What this does:**
+1. Checks for available ports (8000 and 3000).
+2. Creates and activates a Python virtual environment in `backend/venv`.
+3. Installs backend requirements from `REQUIREMENTS.txt`.
+4. Installs frontend `node_modules`.
+5. Starts the FastAPI backend and Next.js frontend in parallel.
+
+### 🛑 Stopping the Application
+
+To gracefully terminate the running backend and frontend processes:
+
+```bash
+chmod +x stop.sh
+./stop.sh
+```
+
+## ⚙️ Manual Setup (Optional)
+
+If you prefer to run the components independently:
+
+**Backend:**
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r ../requirements.txt  # Install from root requirements.txt
-python -m uvicorn api:app --host 0.0.0.0 --port 8000
+source venv/bin/activate  # Or `venv\Scripts\activate` on Windows
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
 ```
 
-### 2. Start Frontend
-
+**Frontend:**
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-### 3. Access Application
+## 📊 Deep Learning Pipeline
 
-- **Frontend**: http://localhost:3000
-- **API Docs**: http://localhost:8000/docs
-- **Health Check**: http://localhost:8000/health
+The complete training and inference pipeline is located in the `/ml-model` directory.
+*   `train_pipeline.py` orchestrates the model's data preprocessing, scaling, baseline training, and final hybrid model tuning.
+*   The Bayesian network (`pgmpy`) generates probabilistic embeddings that are fed with standard scaled features into the `PyTorch`-based Bayesian Neural Output layer.
+*   To retrain: Ensure your raw data is placed in `ml-model/data/raw/` or `ml-model/dataset/raw_data/` and execute `python train_pipeline.py`.
 
-## 🔧 API Endpoints
+## 📜 Database Initialization
 
-### Predictions
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/predictions/predict` | POST | Basic prediction |
-| `/api/predictions/predict/explain` | POST | Prediction with explanation |
-| `/api/predictions/eligibility` | POST | Full eligibility check |
-
-### Health
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | API health status |
-| `/api/model/health` | GET | Model health status |
-
-## 📊 Training the Model
+All schema migrations reside in `database/supabase/migrations/`. You can execute these sequentially on your running PostgreSQL instance or via the Supabase CLI:
 
 ```bash
-cd ml-model
-python -m training.train_pipeline \
-    --data data/processed/home_credit_consolidated_preprocessed.csv \
-    --output models/hybrid \
-    --use-class-weights
+cd database
+supabase start       # If using local supabase
+supabase db push     # Upgrades Remote/Local database with migrations
 ```
-
-### Training Options
-- `--use-class-weights`: Apply sklearn class weights (recommended)
-- `--use-focal`: Use focal loss instead of BCE
-- `--use-smote`: Apply SMOTE oversampling
-
-## 📈 Model Comparison Report
-
-See [HYBRID_BAYESIAN_MODEL_FINAL_REPORT.md](HYBRID_BAYESIAN_MODEL_FINAL_REPORT.md) for detailed analysis.
-
-## 🔐 Authentication
-
-The API uses JWT authentication. Login to get a token:
-
-```bash
-curl -X POST http://localhost:8000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com", "password": "password"}'
-```
-
-Use the token in subsequent requests:
-```bash
-curl http://localhost:8000/api/predictions/predict \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"features": {...}}'
-```
-
-## 📝 License
-
-This project is developed as part of a Final Year Project.
-
-## 👥 Contributors
-
-- Project Owner: Thanuja
