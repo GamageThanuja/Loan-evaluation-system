@@ -50,4 +50,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'applicants' AND column_name = 'country') THEN
         ALTER TABLE applicants ADD COLUMN country VARCHAR(100) DEFAULT 'Sri Lanka';
     END IF;
+    
+    -- Add credit_score column if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'applicants' AND column_name = 'credit_score') THEN
+        ALTER TABLE applicants ADD COLUMN credit_score INTEGER DEFAULT 0;
+    END IF;
 END $$;

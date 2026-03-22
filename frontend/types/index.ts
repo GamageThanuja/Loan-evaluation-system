@@ -522,52 +522,17 @@ export interface EligibilityResult {
     importance: number;
     direction: string;
   }[];
-  risk_analysis?: {
-    concerns?: Array<{ factor?: string; explanation?: string; severity?: string }>;
-    positive_factors?: Array<{ factor?: string; explanation?: string; severity?: string }>;
-  };
-  risk_factors: FeatureInfluence[];
-  protective_factors: FeatureInfluence[];
+  risk_analysis?: any; // Allow flexible structure
+  risk_factors: any[]; // Allow flexible structure for rule-based vs ML factors
+  protective_factors: any[]; // Allow flexible structure
   recommendations: string[];
   confidence_score: number;
   model_type?: string;
   // Additional fields for loan details display
-  loan_details?: {
-    requested_amount: number;
-    requested_amount_formatted: string;
-    loan_term_months: number;
-    loan_term_description: string;
-    interest_rate: string;
-    monthly_payment_principal_only: number;
-    monthly_payment_principal_only_formatted: string;
-    monthly_payment_with_interest: number;
-    monthly_payment_with_interest_formatted: string;
-    interest_note: string;
-  };
-  financial_profile?: {
-    monthly_income: number;
-    monthly_income_formatted: string;
-    annual_income: number;
-    annual_income_formatted: string;
-    loan_to_income_ratio: number;
-    loan_to_income_description: string;
-    payment_to_income_ratio: number;
-    payment_to_income_description: string;
-  };
-  raw_decision?: {
-    eligible: boolean;
-    status: string;
-    risk_level: string;
-    risk_score_percentage: number;
-    risk_explanation: string;
-  };
-  raw_model_info?: {
-    model_type: string;
-    confidence_score: number;
-    confidence_description: string;
-    threshold_used: number;
-    note: string;
-  };
+  loan_details?: any;
+  financial_profile?: any;
+  raw_decision?: any;
+  raw_model_info?: any;
 }
 
 export interface PredictionWithReasoning {

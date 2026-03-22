@@ -413,6 +413,21 @@ class LoanReasoningEngine:
             eligible = False
         elif model_probability < threshold:
             eligible = False
+            # Add generic ML risk factor if no other specific risks were found
+            if not self.risk_factors:
+                self.risk_factors.append(RiskFactor(
+                    factor_name="Overall Risk Assessment",
+                    severity="critical",
+                    current_value=f"{model_probability*100:.1f}% Score",
+                    expected_value=f"> {threshold*100:.0f}%",
+                    impact_description="Our AI model identified a high-risk pattern in your application profile based on historical data patterns."
+                ))
+                self.suggestions.append(Suggestion(
+                    action="Review your application details or apply with a co-borrower",
+                    reason="The overall combination of factors suggests high repayment risk",
+                    expected_improvement="Strengthening your profile with a guarantor or higher down payment may help",
+                    priority=1
+                ))
         else:
             eligible = True
         

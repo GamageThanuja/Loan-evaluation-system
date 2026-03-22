@@ -145,13 +145,17 @@ async def check_eligibility(
         eligible = (prediction == 1)
         
         # 4. Multi-factor Reasoning
+        # Calculate days employed from years_employed (if available)
+        days_employed = int(applicant.get('years_employed', 0) * 365) if applicant.get('years_employed') is not None else None
+
         loan_reasoning = evaluate_loan_application(
             model_probability=probability,
             loan_amount=request.loan_amount,
             monthly_income=monthly_income,
             loan_term_months=request.loan_term_months,
             # Pass credit_score directly, default to None if missing (reasoning engine will handle or use 0)
-            credit_score=applicant.get('credit_score')
+            credit_score=applicant.get('credit_score'),
+            days_employed=days_employed
         )
         
         # Override eligibility based on strict reasoning rules if needed
