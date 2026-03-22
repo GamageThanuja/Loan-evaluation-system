@@ -281,7 +281,6 @@ export default function Dashboard() {
                           <TableCell>Risk Score</TableCell>
                           <TableCell>Risk Level</TableCell>
                           <TableCell>Decision</TableCell>
-                          <TableCell>Time</TableCell>
                           <TableCell>Status</TableCell>
                         </TableRow>
                       </TableHead>
@@ -325,7 +324,7 @@ export default function Dashboard() {
                               </TableCell>
                               <TableCell>
                                 <Chip
-                                  label={application.decision}
+                                  label={application.decision || 'PENDING'}
                                   size="small"
                                   color={
                                     application.decision === 'APPROVE'
@@ -335,11 +334,6 @@ export default function Dashboard() {
                                       : 'warning'
                                   }
                                 />
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant="caption" color="text.secondary">
-                                  {formatRelativeTime(application.timestamp)}
-                                </Typography>
                               </TableCell>
                               <TableCell>
                                 <Chip

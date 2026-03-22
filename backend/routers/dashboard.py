@@ -59,12 +59,29 @@ async def get_recent_applications(limit: int = 10) -> Dict[str, Any]:
         for app in applicants:
             risk_score = app.get("risk_score", 0.0)
             status_text = app.get("eligibility_status") or "pending"
+            full_name = f"{app.get('first_name', '')} {app.get('last_name', '')}".strip()
+            applicant_name = (
+                full_name
+                or app.get("name")
+                or app.get("full_name")
+                or app.get("applicant_name")
+                or app.get("email")
+                or app.get("nic")
+                or f"Applicant #{app.get('id', '')}"
+            )
             
+            decision = "PENDING"
+            if status_text == "eligible":
+                decision = "APPROVE"
+            elif status_text == "not_eligible":
+                decision = "REJECT"
+
             recent_apps.append({
                 "id": app["id"],
-                "applicantName": f"{app.get('first_name', '')} {app.get('last_name', '')}".strip() or "Unknown",
+                "applicantName": applicant_name,
                 "riskScore": risk_score,
                 "status": status_text.replace("_", " ").title(),
+                "decision": decision,
                 "loanAmount": app.get("loan_amount", 0),
                 "date": app.get("created_at", "")
             })
