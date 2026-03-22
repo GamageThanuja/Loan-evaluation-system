@@ -191,7 +191,8 @@ async def check_eligibility(
                     "eligible": final_eligible,
                     "status": "APPROVE" if final_eligible else "REJECT",
                     "risk_level": loan_reasoning.risk_level,
-                    "probability_percentage": round(probability * 100, 1)
+                    "probability_percentage": round(probability * 100, 1),
+                    "confidence": result.get('confidence', 0.0)
                 },
                 "financials": {
                     "loan_amount": request.loan_amount,
@@ -215,4 +216,51 @@ async def check_eligibility(
         raise
     except Exception as e:
         logger.error(f"Eligibility error: {e}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
+
+@router.get("/ping")
+async def ping():
+    return {"message": "pong"}
+
+@router.get("/reports/lime/{applicant_id}")
+async def get_lime_report(
+    applicant_id: str,
+    user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
+):
+    """Generate LIME XAI report (HTML) for an applicant"""
+    if hybrid_predictor is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Model not loaded")
+    
+    try:
+        # 1. Fetch Applicant
+        applicant = db.get_applicant_by_id(applicant_id)
+        if not applicant:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Applicant not found")
+        
+        # 2. Prepare Features
+        # We need loan details to prepare features. If not in applicant record, use defaults/estimates
+        # For a report, we should ideally use the values from the latest prediction or the application itself
+        loan_amount = applicant.get('loan_amount', 0)
+        loan_term = applicant.get('loan_term_months', 12)
+        
+        features = hybrid_predictor.prepare_features_from_applicant(
+            applicant, loan_amount, loan_term
+        )
+        
+        # 3. Generate LIME Report
+        report = hybrid_predictor.generate_lime_report(features, applicant_id)
+        
+        if "error" in report:
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"LIME error: {report['error']}")
+            
+        return {
+            "success": True,
+            "html": report.get("html_report", "<h1>No report generated</h1>"),
+            "data": report.get("summary_json", {})
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Report generation error: {e}")
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))

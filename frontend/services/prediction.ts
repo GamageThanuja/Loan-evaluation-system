@@ -308,7 +308,11 @@ export const predictionService = {
       const transformedData: EligibilityResult = {
         applicant_id: apiData.applicant_id,
         eligible: apiData.decision?.eligible ?? false,
-        risk_score: (apiData.decision?.probability_percentage ?? 0) / 100, // Convert percentage to decimal
+        
+        // Fix: Risk Score should be (100% - Approval Probability)
+        // If approval probability is 0%, Risk Score is 100% (High Risk)
+        risk_score: Math.max(0, 100 - (apiData.decision?.probability_percentage ?? 0)) / 100, 
+        
         probability: (apiData.decision?.probability_percentage ?? 0) / 100,
         decision: apiData.decision?.status || 'REJECT',
         risk_level: apiData.decision?.risk_level || 'Unknown',
@@ -343,7 +347,8 @@ export const predictionService = {
         // Map suggestions to recommendations
         recommendations: (apiData.reasoning?.suggestions || []).map((s: any) => s.action || s),
         
-        confidence_score: 0.95, // Hardcode high confidence as model is deterministic/hybrid
+        // Use actual confidence from backend if available, otherwise default
+        confidence_score: (apiData.decision?.confidence ?? 95) / 100,
         model_type: 'Hybrid ANN + BN',
         
         // Include raw loan/financial data for "Try Different Parameters" feature

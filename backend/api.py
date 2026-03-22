@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="LoanWise API",
     description="ML-powered loan approval system with explainable AI",
-    version="2.0.0",
+    version="2.0.1", # Bump version to force reload
     docs_url="/docs",
     redoc_url="/redoc"
 )
