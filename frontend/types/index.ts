@@ -63,6 +63,7 @@ export interface Applicant {
   educationLevel?: string;
   
   // Metadata
+  applicationNumber?: number;
   createdAt: string;
   updatedAt: string;
   status: 'pending' | 'approved' | 'rejected' | 'under_review';

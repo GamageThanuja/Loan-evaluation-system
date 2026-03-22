@@ -309,6 +309,7 @@ async def list_applicants(
                 "rejection_reason": app.get("rejection_reason"),
                 "created_at": app.get("created_at"),
                 "updated_at": app.get("updated_at"),
+                "application_number": app.get("application_number"),
             })
         
         return {
@@ -424,6 +425,7 @@ async def get_applicant(
             # Metadata
             "created_at": applicant.get("created_at"),
             "updated_at": applicant.get("updated_at"),
+            "application_number": applicant.get("application_number"),
         }
         
         if prediction:

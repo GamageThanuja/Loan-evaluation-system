@@ -146,7 +146,7 @@ export default function ApplicantDetailPage() {
             );
           })()}
           <Chip
-            label={`Loan ID: ${applicant.id}`}
+            label={`Loan ID: ${applicant.applicationNumber ? String(applicant.applicationNumber).padStart(3, '0') : applicant.id.substring(0, 8)}`}
             variant="outlined"
             size="small"
           />

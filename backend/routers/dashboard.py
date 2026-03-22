@@ -78,6 +78,7 @@ async def get_recent_applications(limit: int = 10) -> Dict[str, Any]:
 
             recent_apps.append({
                 "id": app["id"],
+                "applicationNumber": app.get("application_number"),
                 "applicantName": applicant_name,
                 "riskScore": risk_score,
                 "status": status_text.replace("_", " ").title(),
