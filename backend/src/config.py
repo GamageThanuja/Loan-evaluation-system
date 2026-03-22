@@ -19,13 +19,15 @@ class Config:
     PROJECT_ROOT = PROJECT_ROOT
     OVERALL_PROJECT_ROOT = OVERALL_PROJECT_ROOT
     
-    # Data paths - Use ml-model directory for actual data
-    DATA_DIR = OVERALL_PROJECT_ROOT / 'ml-model' / 'dataset'
+    # Data paths - Try local 'dataset' folder first (for Docker/HF Spaces), else fallback to 'ml-model/dataset'
+    LOCAL_DATA_DIR = PROJECT_ROOT / 'dataset'
+    DATA_DIR = LOCAL_DATA_DIR if LOCAL_DATA_DIR.exists() else OVERALL_PROJECT_ROOT / 'ml-model' / 'dataset'
     DATA_RAW = DATA_DIR / 'raw_data'
     DATA_PROCESSED = DATA_DIR / 'processed_data'
     
-    # Model paths - Use ml-model directory for trained models
-    MODELS_DIR = OVERALL_PROJECT_ROOT / 'ml-model' / 'models'
+    # Model paths - Try local 'models' folder first (for Docker/HF Spaces), else fallback to 'ml-model/models'
+    LOCAL_MODELS_DIR = PROJECT_ROOT / 'models'
+    MODELS_DIR = LOCAL_MODELS_DIR if LOCAL_MODELS_DIR.exists() else OVERALL_PROJECT_ROOT / 'ml-model' / 'models'
     
     # Output paths
     REPORTS_DIR = OVERALL_PROJECT_ROOT / 'ml-model' / 'reports'

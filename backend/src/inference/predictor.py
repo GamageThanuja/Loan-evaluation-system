@@ -84,7 +84,8 @@ class LoanPredictor:
         """Load best DL model, BN model, scaler, and feature names."""
 
         # 1. Registry
-        registry_path = ML_MODEL_PATH / "models" / "model_registry.json"
+        from src.config import Config
+        registry_path = Config.MODEL_REGISTRY
         if registry_path.exists():
             with open(registry_path) as f:
                 self.registry = json.load(f)
@@ -97,7 +98,7 @@ class LoanPredictor:
         hyperparams = best_info.get("hyperparameters", {})
 
         # 2. DL model
-        dl_path = Path(model_path) if model_path else ML_MODEL_PATH / "models" / "best_model.pth"
+        dl_path = Path(model_path) if model_path else Config.BEST_MODEL
         if not dl_path.exists():
             raise FileNotFoundError(f"Best model not found: {dl_path}")
 
@@ -108,7 +109,7 @@ class LoanPredictor:
         logger.info(f"✅ Loaded DL model from {dl_path}")
 
         # 3. Bayesian Network
-        bn_path = ML_MODEL_PATH / "models" / "bayesian_network.pkl"
+        bn_path = Config.BAYESIAN_MODEL
         if bn_path.exists():
             self.bn_model = joblib.load(bn_path)
             logger.info("✅ Loaded Bayesian Network")
@@ -116,7 +117,7 @@ class LoanPredictor:
             logger.warning(f"BN model not found: {bn_path}")
 
         # 4. Scaler
-        scaler_path = ML_MODEL_PATH / "dataset" / "processed_data" / "scaler.joblib"
+        scaler_path = Config.DATA_PROCESSED / "scaler.joblib"
         if scaler_path.exists():
             self.scaler = joblib.load(scaler_path)
             logger.info("✅ Loaded scaler")
@@ -124,7 +125,7 @@ class LoanPredictor:
             logger.warning(f"Scaler not found: {scaler_path}")
 
         # 5. Feature names
-        fn_path = ML_MODEL_PATH / "dataset" / "processed_data" / "feature_names.json"
+        fn_path = Config.DATA_PROCESSED / "feature_names.json"
         if fn_path.exists():
             with open(fn_path) as f:
                 self.feature_names = json.load(f)

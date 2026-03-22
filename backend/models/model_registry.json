@@ -1,0 +1,149 @@
+{
+  "best_model": {
+    "name": "ANN + BN Baseline",
+    "architecture": "ANN",
+    "phase": "baseline",
+    "path": "best_model.pth",
+    "bayesian_network_path": "bayesian_network.pkl",
+    "metrics": {
+      "accuracy": 0.9968798751950078,
+      "precision": 0.9950124688279302,
+      "recall": 1.0,
+      "f1": 0.9975,
+      "roc_auc": 0.9997307317881481,
+      "mse": 0.004292744677513838,
+      "rmse": 0.06551904057229346,
+      "aic": 84372.36074683604,
+      "bic": 87638.35486018377
+    },
+    "cross_validation": {
+      "accuracy_mean": 0.996329748575401,
+      "accuracy_std": 0.003283398186103577,
+      "precision_mean": 0.9969035409035409,
+      "precision_std": 0.0033509488161988896,
+      "recall_mean": 0.9960137746992916,
+      "recall_std": 0.004254852776078561,
+      "f1_mean": 0.9964547646669443,
+      "f1_std": 0.00317447889915755,
+      "roc_auc_mean": 0.9999483710892557,
+      "roc_auc_std": 7.100103992090963e-05
+    },
+    "selection_weights": {
+      "f1": 0.4,
+      "roc_auc": 0.3,
+      "accuracy": 0.2,
+      "rmse_inv": 0.1
+    },
+    "feature_names": [
+      "no_of_dependents",
+      "education",
+      "self_employed",
+      "income_annum",
+      "loan_amount",
+      "loan_term",
+      "cibil_score",
+      "residential_assets_value",
+      "commercial_assets_value",
+      "luxury_assets_value",
+      "bank_asset_value",
+      "loan_to_income_ratio",
+      "total_assets",
+      "assets_to_loan_ratio",
+      "assets_to_income_ratio",
+      "debt_to_asset_ratio",
+      "monthly_payment",
+      "payment_to_income_ratio",
+      "cibil_excellent",
+      "cibil_good",
+      "cibil_fair",
+      "cibil_poor",
+      "bn_risk_embedding"
+    ],
+    "input_dim": 23,
+    "hyperparameters": {
+      "hidden_dims": [
+        64,
+        32
+      ],
+      "dropout": 0.3,
+      "learning_rate": 0.001,
+      "batch_size": 64,
+      "epochs": 100,
+      "optimizer": "adam",
+      "patience": 15
+    },
+    "created_at": "2026-03-22T21:37:53.551463"
+  },
+  "all_models": {
+    "ANN + BN Baseline": {
+      "accuracy": 0.9968798751950078,
+      "precision": 0.9950124688279302,
+      "recall": 1.0,
+      "f1": 0.9975,
+      "roc_auc": 0.9997307317881481,
+      "mse": 0.004292744677513838,
+      "rmse": 0.06551904057229346,
+      "aic": 84372.36074683604,
+      "bic": 87638.35486018377
+    },
+    "LSTM + BN Baseline": {
+      "accuracy": 0.9906396255850234,
+      "precision": 0.9924812030075187,
+      "recall": 0.9924812030075187,
+      "f1": 0.9924812030075187,
+      "roc_auc": 0.9997721576668944,
+      "mse": 0.006556485779583454,
+      "rmse": 0.08097212964707952,
+      "aic": 84372.36074683604,
+      "bic": 87638.35486018377
+    },
+    "RNN + BN Baseline": {
+      "accuracy": 0.9890795631825273,
+      "precision": 0.99,
+      "recall": 0.9924812030075187,
+      "f1": 0.9912390488110138,
+      "roc_auc": 0.999678949439715,
+      "mse": 0.008135657757520676,
+      "rmse": 0.09019788111436253,
+      "aic": 84372.36074683604,
+      "bic": 87638.35486018377
+    },
+    "ANN + BN Tuned": {
+      "accuracy": 0.9953198127925117,
+      "precision": 0.995,
+      "recall": 0.9974937343358395,
+      "f1": 0.9962453066332916,
+      "roc_auc": 0.9998446529547008,
+      "mse": 0.004359112121164799,
+      "rmse": 0.06602357246593674,
+      "aic": 84372.36074683604,
+      "bic": 87638.35486018377
+    },
+    "LSTM + BN Tuned": {
+      "accuracy": 0.9890795631825273,
+      "precision": 0.9875621890547264,
+      "recall": 0.9949874686716792,
+      "f1": 0.9912609238451935,
+      "roc_auc": 0.9996271670912819,
+      "mse": 0.008389093913137913,
+      "rmse": 0.0915919969928482,
+      "aic": 84372.36074683604,
+      "bic": 87638.35486018377
+    },
+    "RNN + BN Tuned": {
+      "accuracy": 0.9953198127925117,
+      "precision": 0.995,
+      "recall": 0.9974937343358395,
+      "f1": 0.9962453066332916,
+      "roc_auc": 0.9984154601379482,
+      "mse": 0.004581997636705637,
+      "rmse": 0.0676904545464546,
+      "aic": 84372.36074683604,
+      "bic": 87638.35486018377
+    }
+  },
+  "bayesian_network": {
+    "aic": 84372.36074683604,
+    "bic": 87638.35486018377
+  }
+}
