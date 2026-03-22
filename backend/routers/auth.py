@@ -24,6 +24,7 @@ router = APIRouter(prefix="/api/auth", tags=["Auth"])
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    role: str = None
 
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -41,6 +42,10 @@ async def login(request: LoginRequest):
     password_hash = user.get("password_hash")
     if not password_hash or not verify_password(request.password, password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+        
+    # Check if the requested role matches the user's actual role in the database
+    if request.role and request.role != user.get("role"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, f"Cannot login as {request.role}. Your assigned role is {user.get('role')}.")
         
     token = AuthMiddleware.create_access_token({
         "user_id": user["id"],
