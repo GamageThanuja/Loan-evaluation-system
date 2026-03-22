@@ -56,7 +56,7 @@ type EligibilityStatus = 'idle' | 'processing' | 'eligible' | 'not-eligible';
 // Processing messages to cycle through
 const processingMessages = [
   'Analyzing with Bayesian Network...',
-  'Processing through TabNet model...',
+  'Processing through ANN model...',
   'Evaluating risk factors...',
   'Computing inference paths...',
   'Generating reasoning...',
