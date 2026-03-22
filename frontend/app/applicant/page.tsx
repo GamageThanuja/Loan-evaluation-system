@@ -257,12 +257,8 @@ export default function ApplicantListPage() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box>
-          <Typography variant="h4" gutterBottom fontWeight={700}>
-            All Applicants
-          </Typography>
-        </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 3 }}>
+
         <Button
           variant="contained"
           startIcon={<PersonAdd />}

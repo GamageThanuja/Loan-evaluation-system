@@ -85,6 +85,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   const isLoansPath = pathname.startsWith('/applicant');
 
+  const getPageTitle = (path: string) => {
+    if (path === '/') return 'Dashboard';
+    if (path === '/applicant/new') return 'New Applicant';
+    if (path === '/applicant') return 'All Applicants';
+    if (path.startsWith('/applicant/')) return 'Applicant Details';
+    if (path === '/eligibility') return 'Eligibility';
+    if (path === '/review') return 'Review';
+    if (path === '/reports') return 'Reports';
+    if (path.startsWith('/settings')) return 'Settings';
+    return 'Loan Evaluation System';
+  };
+
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Toolbar sx={{ bgcolor: 'primary.main', color: 'white' }}>
@@ -313,7 +325,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Loan Evaluation System
+            {getPageTitle(pathname)}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Box sx={{ display: { xs: 'none', sm: 'block' }, textAlign: 'right' }}>

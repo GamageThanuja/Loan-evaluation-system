@@ -182,13 +182,7 @@ export default function ReportsPage() {
 
   return (
     <Box>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Box>
-          <Typography variant="h4" gutterBottom fontWeight={700}>
-            Reports
-          </Typography>
-        </Box>
-      </Box>
+
 
       {/* Filters & Search */}
       <Card sx={{ mb: 4, p: 2 }}>

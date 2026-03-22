@@ -162,14 +162,7 @@ export default function SettingsPage() {
 
   return (
     <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" gutterBottom fontWeight={700}>
-          Settings
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Manage your account and application settings
-        </Typography>
-      </Box>
+
 
       {successMessage && (
         <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccessMessage(null)}>

@@ -910,14 +910,6 @@ export default function NewApplicantPage() {
 
   return (
     <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" gutterBottom fontWeight={700}>
-          New Applicant
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Register a new loan applicant by entering their information below
-        </Typography>
-      </Box>
 
       {submitError && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setSubmitError(null)}>

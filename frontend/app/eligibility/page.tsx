@@ -380,12 +380,7 @@ export default function EligibilityPage() {
 
   return (
     <Box>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" gutterBottom fontWeight={700}>
-          Loan Eligibility Evaluation
-        </Typography>
-       
-      </Box>
+ 
 
       {apiError && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setApiError(null)}>

@@ -255,14 +255,7 @@ export default function ReviewPage() {
 
   return (
     <Box>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" gutterBottom fontWeight={700}>
-          Loan Application Review
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Review and approve or reject loan applications submitted for manager approval
-        </Typography>
-      </Box>
+
 
       {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
