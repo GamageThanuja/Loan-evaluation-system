@@ -135,11 +135,11 @@ export default function PrintReportPage({ params }: PageProps) {
             })),
         ];
 
-    const concernItems = (eligibilityData?.risk_analysis?.concerns || []).map((item) => {
+    const concernItems = (eligibilityData?.risk_analysis?.concerns || []).map((item: any) => {
         const factor = item.factor ? `${item.factor}: ` : '';
         const explanation = item.explanation || '';
         return `${factor}${explanation}`.trim();
-    }).filter((item) => item);
+    }).filter((item: any) => item);
 
     const fallbackConcerns = (eligibilityData?.risk_factors || []).map((item: any) => {
         const factor = item.feature || item.feature_name || 'Risk factor';

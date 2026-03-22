@@ -105,35 +105,6 @@ export default function ReportsPage() {
     );
   };
 
-  const getEligibilityChip = (eligibilityStatus: string | null | undefined) => {
-    if (!eligibilityStatus) {
-      const notCheckedStatus = statusUtils.getEligibilityStatus('not_checked');
-      return (
-        <Chip 
-          label={notCheckedStatus?.name || 'Not Checked'} 
-          size="small" 
-          variant="outlined" 
-        />
-      );
-    }
-
-    const eligibilityInfo = statusUtils.getEligibilityStatus(eligibilityStatus);
-    const eligibilityName = eligibilityInfo?.name || statusUtils.getEligibilityName(eligibilityStatus);
-    
-    // Map eligibility to color
-    let color: 'success' | 'error' | 'default' = 'default';
-    if (eligibilityInfo?.code === 'eligible') color = 'success';
-    else if (eligibilityInfo?.code === 'not_eligible') color = 'error';
-
-    return (
-      <Chip 
-        label={eligibilityName} 
-        size="small" 
-        color={color}
-        variant="outlined" 
-      />
-    );
-  };
 
   const handleGenerateReport = async (applicantId: number) => {
     try {

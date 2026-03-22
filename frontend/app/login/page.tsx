@@ -98,7 +98,9 @@ export default function LoginPage() {
     // Handle remember me
     if (rememberMe) {
       localStorage.setItem('rememberedEmail', formData.email);
-      localStorage.setItem('rememberedRole', formData.role);
+      if (formData.role) {
+        localStorage.setItem('rememberedRole', formData.role);
+      }
     } else {
       localStorage.removeItem('rememberedEmail');
       localStorage.removeItem('rememberedRole');

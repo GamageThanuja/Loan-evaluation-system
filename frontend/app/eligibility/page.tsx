@@ -35,7 +35,6 @@ import {
   TrendingUp,
   TrendingDown,
   Psychology,
-  Settings,
 } from '@mui/icons-material';
 import predictionService from '@/services/prediction';
 import { applicantService } from '@/services/applicants';

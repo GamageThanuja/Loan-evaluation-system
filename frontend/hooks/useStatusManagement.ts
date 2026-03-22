@@ -7,10 +7,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { statusManagementService } from '@/services/statusManagement';
 import type {
-  EligibilityStatus,
-  ApplicationStatus,
-  ApplicationStatusWithColor,
-  StatusColor,
   EligibilityStatusCreate,
   EligibilityStatusUpdate,
   ApplicationStatusCreate,

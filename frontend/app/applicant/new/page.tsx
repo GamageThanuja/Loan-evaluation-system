@@ -349,7 +349,7 @@ export default function NewApplicantPage() {
         monthly_income: formData.monthlyIncome,
         education_level: formData.educationLevel,
         assets_value: formData.assetsValue,
-        credit_score: formData.creditScore > 0 ? formData.creditScore : null,
+        credit_score: formData.creditScore && formData.creditScore > 0 ? formData.creditScore : null,
         loan_amount: formData.loanAmount,
         loan_purpose: formData.loanPurpose,
         loan_term_months: formData.loanTermMonths,

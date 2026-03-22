@@ -22,7 +22,6 @@ import {
   useTheme,
   useMediaQuery,
   Collapse,
-  Chip,
 } from '@mui/material';
 import {
   Menu as MenuIcon,

@@ -29,7 +29,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useFinancialStats, useMonthlyStats, useRecentApplications } from '@/hooks/useDashboard';
 import { DashboardStatsSkeleton, TableSkeleton } from '@/components/ui/LoadingSkeleton';
-import { formatRelativeTime, getRiskLevel, getRiskColor } from '@/lib/utils';
+import { getRiskLevel, getRiskColor } from '@/lib/utils';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 
 // Format currency in LKR
