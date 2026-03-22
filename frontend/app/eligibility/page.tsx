@@ -602,9 +602,6 @@ export default function EligibilityPage() {
                   <Typography variant="h5" fontWeight={600} color="primary.main" gutterBottom>
                     {processingMessage}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Using Hybrid TabNet + Bayesian Network Model
-                  </Typography>
                 </CardContent>
               </Card>
             </Fade>
