@@ -20,7 +20,12 @@ CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_role ON users(role);
 
 -- User Roles Enum
-CREATE TYPE user_role AS ENUM ('loan_officer', 'bank_manager', 'admin');
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+        CREATE TYPE user_role AS ENUM ('loan_officer', 'manager', 'admin');
+    END IF;
+END $$;
 
 -- Trigger for updated_at
 CREATE TRIGGER users_updated_at

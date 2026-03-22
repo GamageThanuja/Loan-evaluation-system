@@ -646,4 +646,8 @@ export interface ApplicantOption {
   name: string;
   nic: string;
   email: string;
+  monthlyIncome?: number;
+  loanAmount?: number;
+  loanTerm?: number;
+  loanTermMonths?: number;
 }

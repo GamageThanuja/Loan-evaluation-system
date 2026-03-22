@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/loan-details", tags=["Loan Details"])
 
 @router.get("/{applicant_id}")
 async def get_loan_details(
-    applicant_id: int,
+    applicant_id: str,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
     """Get comprehensive loan application details"""

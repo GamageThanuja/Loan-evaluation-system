@@ -185,7 +185,7 @@ class SupabaseClient:
             logger.error(f"Error getting applicants: {e}")
             return {"data": [], "total": 0, "page": page, "page_size": page_size, "total_pages": 0}
     
-    def get_applicant_by_id(self, applicant_id: int) -> Optional[Dict[str, Any]]:
+    def get_applicant_by_id(self, applicant_id: str) -> Optional[Dict[str, Any]]:
         """Get applicant by ID"""
         try:
             response = self.client.table("applicants").select("*").eq("id", applicant_id).single().execute()
@@ -193,7 +193,7 @@ class SupabaseClient:
         except Exception as e:
             logger.error(f"Error getting applicant: {e}")
             return None
-    
+
     def create_applicant(self, applicant_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Create a new applicant"""
         try:
@@ -204,7 +204,7 @@ class SupabaseClient:
             logger.error(f"Error creating applicant: {e}")
             return None
     
-    def update_applicant(self, applicant_id: int, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_applicant(self, applicant_id: str, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update applicant"""
         try:
             response = self.client.table("applicants").update(update_data).eq("id", applicant_id).execute()
@@ -216,7 +216,7 @@ class SupabaseClient:
     
     def approve_applicant(
         self,
-        applicant_id: int,
+        applicant_id: str,
         approved_by: str,
         notes: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
@@ -231,7 +231,7 @@ class SupabaseClient:
     
     def reject_applicant(
         self,
-        applicant_id: int,
+        applicant_id: str,
         rejected_by: str,
         reason: str
     ) -> Optional[Dict[str, Any]]:
@@ -258,7 +258,7 @@ class SupabaseClient:
             logger.error(f"Error creating prediction: {e}")
             return None
     
-    def get_prediction_by_applicant(self, applicant_id: int) -> Optional[Dict[str, Any]]:
+    def get_prediction_by_applicant(self, applicant_id: str) -> Optional[Dict[str, Any]]:
         """Get latest prediction for an applicant"""
         try:
             response = (
@@ -330,7 +330,7 @@ class SupabaseClient:
         except Exception as e:
             logger.error(f"Error logging action: {e}")
 
-    def get_audit_logs(self, applicant_id: int) -> List[Dict[str, Any]]:
+    def get_audit_logs(self, applicant_id: str) -> List[Dict[str, Any]]:
         """Get audit logs for an applicant"""
         try:
             response = (
@@ -412,7 +412,7 @@ class SupabaseClient:
             logger.error(f"Error creating credit history: {e}")
             return None
     
-    def get_credit_history_by_applicant(self, applicant_id: int) -> List[Dict[str, Any]]:
+    def get_credit_history_by_applicant(self, applicant_id: str) -> List[Dict[str, Any]]:
         """Get all credit history records for an applicant"""
         try:
             response = (
@@ -451,7 +451,7 @@ class SupabaseClient:
             logger.error(f"Error creating repayment history: {e}")
             return None
     
-    def get_repayment_history_by_applicant(self, applicant_id: int) -> List[Dict[str, Any]]:
+    def get_repayment_history_by_applicant(self, applicant_id: str) -> List[Dict[str, Any]]:
         """Get all repayment history records for an applicant"""
         try:
             response = (
@@ -490,7 +490,7 @@ class SupabaseClient:
             logger.error(f"Error creating transaction: {e}")
             return None
 
-    def get_transactions_by_applicant(self, applicant_id: int) -> List[Dict[str, Any]]:
+    def get_transactions_by_applicant(self, applicant_id: str) -> List[Dict[str, Any]]:
         """Get all transactions for an applicant"""
         try:
             response = (

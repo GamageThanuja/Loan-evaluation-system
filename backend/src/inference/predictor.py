@@ -185,21 +185,23 @@ class LoanPredictor:
 
         Mirrors the feature engineering done in preprocessing.
         """
-        no_of_dependents = applicant.get("no_of_dependents", 0)
-        education = self._encode_education(applicant.get("education_level", "Graduate"))
-        employment_status = str(applicant.get("employment_status", "Employed")).lower()
+        no_of_dependents = applicant.get("no_of_dependents") or 0
+        education = self._encode_education(applicant.get("education_level") or "Graduate")
+        employment_status = str(applicant.get("employment_status") or "Employed").lower()
         self_employed = 1 if "self" in employment_status else 0
 
-        monthly_income = applicant.get("monthly_income", 50000)
+        monthly_income = applicant.get("monthly_income") or 50000
         income_annum = monthly_income * 12
-        cibil_score = applicant.get("credit_score", 650)
+        # Use provided credit score or default to 0 (Poor) if missing
+        # User requested to remove the 650 default
+        cibil_score = applicant.get("credit_score") or 0
 
-        total_assets_db = applicant.get("assets_value", 0)
+        total_assets_db = applicant.get("assets_value") or 0
         if "residential_assets_value" in applicant:
-            res = applicant.get("residential_assets_value", 0)
-            com = applicant.get("commercial_assets_value", 0)
-            lux = applicant.get("luxury_assets_value", 0)
-            bnk = applicant.get("bank_asset_value", 0)
+            res = applicant.get("residential_assets_value") or 0
+            com = applicant.get("commercial_assets_value") or 0
+            lux = applicant.get("luxury_assets_value") or 0
+            bnk = applicant.get("bank_asset_value") or 0
         else:
             res = total_assets_db * 0.7
             com = 0

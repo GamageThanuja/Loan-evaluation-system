@@ -58,7 +58,7 @@ class PredictionRequest(BaseModel):
     features: Dict[str, float] = Field(..., description="Feature values for prediction")
 
 class EligibilityPredictionRequest(BaseModel):
-    applicant_id: int = Field(..., description="Applicant ID")
+    applicant_id: str = Field(..., description="Applicant ID")
     loan_amount: float = Field(..., gt=0, description="Requested loan amount")
     loan_term_months: int = Field(..., ge=6, le=360, description="Loan term in months")
     monthly_income: Optional[float] = Field(None, description="Monthly income")
@@ -131,7 +131,7 @@ async def check_eligibility(
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Applicant not found")
         
         # 2. Prepare Data
-        monthly_income = request.monthly_income or applicant.get('monthly_income', 0)
+        monthly_income = request.monthly_income or applicant.get('monthly_income') or 0
         
         features = hybrid_predictor.prepare_features_from_applicant(
             applicant, request.loan_amount, request.loan_term_months
@@ -150,7 +150,8 @@ async def check_eligibility(
             loan_amount=request.loan_amount,
             monthly_income=monthly_income,
             loan_term_months=request.loan_term_months,
-            credit_score=applicant.get('credit_score', 650)
+            # Pass credit_score directly, default to None if missing (reasoning engine will handle or use 0)
+            credit_score=applicant.get('credit_score')
         )
         
         # Override eligibility based on strict reasoning rules if needed

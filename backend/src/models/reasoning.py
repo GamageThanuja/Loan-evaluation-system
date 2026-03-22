@@ -328,7 +328,7 @@ class LoanReasoningEngine:
             # Convert ext_source (0-1) to credit score range (300-850)
             credit_score = int(300 + ext_source_mean * 550)
         elif credit_score is None:
-            credit_score = 650  # Default assumption
+            credit_score = 0  # No score available (Poor)
         
         # 1. Analyze Credit Score
         score_info, score_risk, score_suggestion = self.analyze_credit_score(credit_score)
@@ -555,12 +555,12 @@ def evaluate_loan_application(
     credit_score: Optional[int] = None,
     days_employed: Optional[int] = None,
     ext_source_mean: Optional[float] = None
-) -> Dict[str, Any]:
+) -> LoanDecision:
     """
     Main entry point for loan evaluation.
-    Returns complete decision with reasoning as dictionary.
+    Returns complete decision object (LoanDecision).
     """
-    decision = reasoning_engine.evaluate_loan(
+    return reasoning_engine.evaluate_loan(
         model_probability=model_probability,
         loan_amount=loan_amount,
         monthly_income=monthly_income,
@@ -569,28 +569,6 @@ def evaluate_loan_application(
         days_employed=days_employed,
         ext_source_mean=ext_source_mean
     )
-    
-    return {
-        "eligible": decision.eligible,
-        "decision": decision.decision,
-        "probability": decision.probability,
-        "risk_level": decision.risk_level,
-        "confidence": decision.confidence,
-        "credit_score": {
-            "score": decision.credit_score_info.score,
-            "rating": decision.credit_score_info.rating.value,
-            "description": decision.credit_score_info.description
-        } if decision.credit_score_info else None,
-        "risk_factors": [rf.to_dict() for rf in decision.risk_factors],
-        "protective_factors": [pf.to_dict() for pf in decision.protective_factors],
-        "suggestions": [s.to_dict() for s in decision.suggestions],
-        "alternative_offer": {
-            "amount": decision.alternative_amount,
-            "term_months": decision.alternative_term
-        } if decision.alternative_amount else None,
-        "summary": decision.summary,
-        "detailed_explanation": decision.detailed_explanation
-    }
 
 
 def get_credit_score_rating(score: int) -> CreditScoreRating:

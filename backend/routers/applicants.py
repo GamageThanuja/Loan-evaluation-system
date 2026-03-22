@@ -121,7 +121,7 @@ class ApplicantUpdate(BaseModel):
 
 class EligibilityRequest(BaseModel):
     """Model for eligibility check request"""
-    applicant_id: int = Field(..., description="Applicant ID")
+    applicant_id: str = Field(..., description="Applicant ID")
     loan_amount: float = Field(..., gt=0, description="Requested loan amount")
     loan_term_months: int = Field(..., ge=6, le=360, description="Loan term in months")
 
@@ -135,7 +135,7 @@ class EligibilityResult(BaseModel):
 
 class ReviewRequest(BaseModel):
     """Model for sending application for review"""
-    applicant_id: int = Field(..., description="Applicant ID")
+    applicant_id: str = Field(..., description="Applicant ID")
     eligibility_result: Dict[str, Any] = Field(..., description="Eligibility result data")
     notes: Optional[str] = Field(None, description="Additional notes")
 
@@ -146,7 +146,7 @@ class ApprovalRequest(BaseModel):
 
 class ApplicantResponse(BaseModel):
     """Full applicant response with all details"""
-    id: int
+    id: str
     first_name: str
     last_name: str
     email: str
@@ -330,7 +330,7 @@ async def list_applicants(
 
 @router.get("/{applicant_id}")
 async def get_applicant(
-    applicant_id: int,
+    applicant_id: str,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
     """
@@ -543,7 +543,7 @@ async def create_applicant(
 
 @router.put("/{applicant_id}")
 async def update_applicant(
-    applicant_id: int,
+    applicant_id: str,
     update_data: ApplicantUpdate,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
@@ -615,7 +615,7 @@ async def update_applicant(
 
 @router.delete("/{applicant_id}")
 async def delete_applicant(
-    applicant_id: int,
+    applicant_id: str,
     user=Depends(AuthMiddleware.require_role(["manager"]))
 ):
     """
@@ -674,7 +674,7 @@ async def delete_applicant(
 
 @router.post("/{applicant_id}/check-eligibility")
 async def check_eligibility(
-    applicant_id: int,
+    applicant_id: str,
     request: EligibilityRequest,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
@@ -754,7 +754,7 @@ async def check_eligibility(
 
 @router.post("/{applicant_id}/send-for-review")
 async def send_for_review(
-    applicant_id: int,
+    applicant_id: str,
     request: ReviewRequest,
     user=Depends(AuthMiddleware.require_role(["loan_officer"]))
 ):
@@ -849,7 +849,7 @@ async def get_pending_reviews(
 
 @router.post("/{applicant_id}/approve")
 async def approve_application(
-    applicant_id: int,
+    applicant_id: str,
     request: ApprovalRequest,
     user=Depends(AuthMiddleware.require_role(["manager"]))
 ):
@@ -912,7 +912,7 @@ async def approve_application(
 
 @router.post("/{applicant_id}/reject")
 async def reject_application(
-    applicant_id: int,
+    applicant_id: str,
     request: ApprovalRequest,
     user=Depends(AuthMiddleware.require_role(["manager"]))
 ):
@@ -985,7 +985,7 @@ async def reject_application(
 
 @router.get("/{applicant_id}/credit-history")
 async def get_credit_history(
-    applicant_id: int,
+    applicant_id: str,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
     """
@@ -1108,7 +1108,7 @@ async def get_credit_history(
 
 @router.get("/{applicant_id}/repayment-history")
 async def get_repayment_history(
-    applicant_id: int,
+    applicant_id: str,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
     """
@@ -1230,7 +1230,7 @@ async def get_repayment_history(
 
 @router.get("/{applicant_id}/transactions")
 async def get_transactions_history(
-    applicant_id: int,
+    applicant_id: str,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
     """
@@ -1337,7 +1337,7 @@ async def get_transactions_history(
 
 @router.get("/{applicant_id}/loan-history")
 async def get_loan_history(
-    applicant_id: int,
+    applicant_id: str,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
     """
@@ -1399,7 +1399,7 @@ async def get_loan_history(
 
 @router.get("/{applicant_id}/audit-trail")
 async def get_audit_trail(
-    applicant_id: int,
+    applicant_id: str,
     user=Depends(AuthMiddleware.require_role(["manager", "loan_officer"]))
 ):
     """

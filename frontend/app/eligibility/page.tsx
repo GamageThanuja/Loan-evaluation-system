@@ -84,6 +84,21 @@ export default function EligibilityPage() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [isEditingParameters, setIsEditingParameters] = useState(false);
   const [addingToQueue, setAddingToQueue] = useState(false);
+
+  const prefillLoanParameters = (applicant: {
+    monthlyIncome?: number;
+    loanAmount?: number;
+    loanTerm?: number;
+    loanTermMonths?: number;
+  }) => {
+    const nextIncome = applicant.monthlyIncome;
+    const nextAmount = applicant.loanAmount;
+    const nextDuration = applicant.loanTermMonths ?? applicant.loanTerm;
+
+    setMonthlyIncome(typeof nextIncome === 'number' && nextIncome > 0 ? nextIncome.toString() : '');
+    setLoanAmount(typeof nextAmount === 'number' && nextAmount > 0 ? nextAmount.toString() : '');
+    setLoanDuration(typeof nextDuration === 'number' && nextDuration > 0 ? nextDuration : '');
+  };
   
   // Determine if loan parameters should be locked (when applicant selected, unless editing)
   const areParametersLocked = Boolean(selectedApplicant && !isEditingParameters);
@@ -100,6 +115,10 @@ export default function EligibilityPage() {
             name: app.name || `${app.firstName || ''} ${app.lastName || ''}`.trim() || 'Unknown',
             nic: app.nic || '',
             email: app.email || '',
+            monthlyIncome: app.monthlyIncome,
+            loanAmount: app.loanAmount,
+            loanTerm: app.loanTerm,
+            loanTermMonths: app.loanTermMonths,
           }));
           setApplicants(applicantOptions);
         }
@@ -117,25 +136,18 @@ export default function EligibilityPage() {
   // Auto-fill loan amount and duration when applicant is selected
   useEffect(() => {
     const fetchApplicantDetails = async () => {
-      if (!selectedApplicant) return;
+      if (!selectedApplicant) {
+        prefillLoanParameters({});
+        return;
+      }
+
+      // Immediate prefill from selected option data.
+      prefillLoanParameters(selectedApplicant);
 
       try {
         const response = await predictionService.getApplicant(selectedApplicant.id);
         if (response.success && response.data) {
-          const applicant = response.data;
-          // Auto-fill loan amount if available
-          if (applicant.loanAmount && applicant.loanAmount > 0) {
-            setLoanAmount(applicant.loanAmount.toString());
-          }
-          // Auto-fill loan term if available (check both camelCase and snake_case)
-          const loanTerm = applicant.loanTermMonths || (applicant as any).loan_term_months;
-          if (loanTerm && loanTerm > 0) {
-            setLoanDuration(loanTerm);
-          }
-          // Auto-fill monthly income if available
-          if (applicant.monthlyIncome && applicant.monthlyIncome > 0) {
-            setMonthlyIncome(applicant.monthlyIncome.toString());
-          }
+          prefillLoanParameters(response.data);
         }
       } catch (error) {
         console.error('Failed to fetch applicant details:', error);
@@ -404,6 +416,7 @@ export default function EligibilityPage() {
                     onChange={(_, newValue) => {
                       setSelectedApplicant(newValue);
                       setIsEditingParameters(false); // Reset editing state when applicant changes
+                      prefillLoanParameters(newValue || {});
                       if (errors.applicant) setErrors({ ...errors, applicant: undefined });
                     }}
                     disabled={evaluationStatus === 'processing'}

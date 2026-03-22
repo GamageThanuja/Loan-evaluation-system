@@ -141,6 +141,7 @@ const newApplicantSchema = z.object({
   monthlyIncome: z.number().min(0, 'Monthly income must be positive'),
   educationLevel: z.enum(['High School', 'Bachelor', 'Master', 'PhD', 'Other']),
   assetsValue: z.number().min(0, 'Assets value must be positive'),
+  creditScore: z.number().min(300, 'CIBIL Score must be at least 300').max(850, 'CIBIL Score must be at most 850').optional().or(z.literal(0)),
 
   // Loan Details
   loanAmount: z.number().min(10000, 'Loan amount must be at least LKR 10,000'),
@@ -180,6 +181,7 @@ export default function NewApplicantPage() {
     monthlyIncome: 0,
     educationLevel: 'Bachelor',
     assetsValue: 0,
+    creditScore: 0,
     loanAmount: 0,
     loanPurpose: '',
     loanTermMonths: 12,
@@ -347,6 +349,7 @@ export default function NewApplicantPage() {
         monthly_income: formData.monthlyIncome,
         education_level: formData.educationLevel,
         assets_value: formData.assetsValue,
+        credit_score: formData.creditScore > 0 ? formData.creditScore : null,
         loan_amount: formData.loanAmount,
         loan_purpose: formData.loanPurpose,
         loan_term_months: formData.loanTermMonths,
@@ -731,6 +734,19 @@ export default function NewApplicantPage() {
                 error={Boolean(errors.assetsValue)}
                 helperText={errors.assetsValue}
                 InputProps={{ startAdornment: <Typography sx={{ mr: 1 }}>LKR</Typography> }}
+                placeholder="0"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="CIBIL Score (Credit Score)"
+                type="number"
+                value={getNumberFieldValue('creditScore')}
+                onChange={handleChange('creditScore')}
+                error={Boolean(errors.creditScore)}
+                helperText={errors.creditScore || "Leave 0 if unknown (Range: 300-850)"}
+                inputProps={{ min: 0, max: 900 }}
                 placeholder="0"
               />
             </Grid>
