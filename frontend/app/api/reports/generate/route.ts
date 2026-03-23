@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 
 export async function POST(req: NextRequest) {
   try {
@@ -171,9 +172,22 @@ export async function POST(req: NextRequest) {
     `;
 
     // 2. Launch Puppeteer to render the HTML
+    const isLocal = process.env.NODE_ENV === 'development';
+    
+    const getLocalExecutablePath = () => {
+      switch (process.platform) {
+        case 'win32': return 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+        case 'linux': return '/usr/bin/google-chrome';
+        case 'darwin': return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+        default: return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+      }
+    };
+
     const browser = await puppeteer.launch({
+      args: isLocal ? ['--no-sandbox', '--disable-setuid-sandbox'] : [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
+      defaultViewport: { width: 1920, height: 1080 },
+      executablePath: isLocal ? getLocalExecutablePath() : await chromium.executablePath(),
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
 
     const page = await browser.newPage();
