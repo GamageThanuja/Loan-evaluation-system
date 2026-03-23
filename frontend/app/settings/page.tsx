@@ -154,7 +154,7 @@ export default function SettingsPage() {
     version: '1.0.0',
     buildNumber: '2025.01.09.001',
     environment: process.env.NODE_ENV || 'development',
-    apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+    apiUrl: process.env.NEXT_PUBLIC_API_URL,
     lastUpdated: 'January 9, 2025',
     nodeVersion: 'v18.x',
     nextVersion: '14.x',

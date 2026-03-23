@@ -3,7 +3,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { FinancialStats } from '@/types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // Dashboard API functions
 const dashboardApi = {

@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Fetch Applicant Data to get loan details
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL;
     
     // Extract token from authState (handle different state structures)
     const token = authState?.token || authState?.state?.token;
