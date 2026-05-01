@@ -271,7 +271,6 @@ export default function Dashboard() {
                         <TableRow>
                           <TableCell>Applicant</TableCell>
                           <TableCell>Loan Amount</TableCell>
-                          <TableCell>Risk Score</TableCell>
                           <TableCell>Risk Level</TableCell>
                           <TableCell>Decision</TableCell>
                           <TableCell>Status</TableCell>
@@ -297,11 +296,6 @@ export default function Dashboard() {
                               <TableCell>
                                 <Typography variant="body2">
                                   {formatLKR(application.loanAmount || 0)}
-                                </Typography>
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant="body2">
-                                  {(application.riskScore * 100).toFixed(1)}%
                                 </Typography>
                               </TableCell>
                               <TableCell>

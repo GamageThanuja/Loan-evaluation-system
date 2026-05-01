@@ -690,24 +690,6 @@ export default function EligibilityPage() {
                     </Box>
                   )}
 
-                  <Divider sx={{ my: 2 }} />
-
-                  {/* Summary */}
-                  <Grid container spacing={1} sx={{ mb: 3 }}>
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="text.secondary">Risk Score</Typography>
-                      <Typography variant="h6" fontWeight={600}>
-                        {(evaluationResult.risk_score * 100).toFixed(1)}%
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="text.secondary">Confidence</Typography>
-                      <Typography variant="h6" fontWeight={600}>
-                        {(evaluationResult.confidence_score * 100).toFixed(0)}%
-                      </Typography>
-                    </Grid>
-                  </Grid>
-
                   <Button
                     variant="contained"
                     color="success"
@@ -858,24 +840,6 @@ export default function EligibilityPage() {
                       </List>
                     </Box>
                   )}
-
-                  <Divider sx={{ my: 2 }} />
-
-                  {/* Summary */}
-                  <Grid container spacing={1} sx={{ mb: 3 }}>
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="text.secondary">Risk Score</Typography>
-                      <Typography variant="h6" fontWeight={600}>
-                        {(evaluationResult.risk_score * 100).toFixed(1)}%
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="text.secondary">Confidence</Typography>
-                      <Typography variant="h6" fontWeight={600}>
-                        {(evaluationResult.confidence_score * 100).toFixed(0)}%
-                      </Typography>
-                    </Grid>
-                  </Grid>
 
                   <Button
                     variant="contained"
